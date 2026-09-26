@@ -14,7 +14,7 @@ namespace randomizer::logic::requirement
     namespace FormTime
     {
         const std::vector<int> ALL_FORM_TIMES = {HUMAN_DAY, HUMAN_NIGHT, WOLF_DAY, WOLF_NIGHT};
-        const std::vector<int> ALL_FORM_TIMES_AND_TWILIGHT = {HUMAN_DAY, HUMAN_NIGHT, WOLF_DAY, WOLF_NIGHT, TWILIGHT};
+        const std::vector<int> ALL_FORM_TIMES_AND_TWILIGHT = {HUMAN_DAY, HUMAN_NIGHT, WOLF_DAY, WOLF_NIGHT, TWILIGHT_WOLF, TWILIGHT_HUMAN};
         const std::vector<int> ALL_FORM_AND_DAY_TIMES = {HUMAN_DAY, HUMAN_NIGHT, WOLF_DAY, WOLF_NIGHT, DAY, NIGHT};
 
         std::string to_string(const int& formTime)
@@ -28,8 +28,10 @@ namespace randomizer::logic::requirement
                 formTimeStr += " Wolf_Day";
             if (formTime & WOLF_NIGHT)
                 formTimeStr += " Wolf_Night";
-            if (formTime & TWILIGHT)
-                formTimeStr += " Twilight";
+            if (formTime & TWILIGHT_WOLF)
+                formTimeStr += " Twilight Wolf";
+            if (formTime & TWILIGHT_HUMAN)
+                formTimeStr += " Twilight Human";
             return formTimeStr;
         }
     } // namespace FormTime
@@ -128,8 +130,11 @@ namespace randomizer::logic::requirement
             case Type::WOLF_LINK:
                 return "Wolf Link";
 
-            case Type::TWILIGHT:
-                return "Twilight";
+            case Type::TWILIGHT_WOLF:
+                return "Twilight Wolf";
+
+            case Type::TWILIGHT_HUMAN:
+                return "Twilight Human";
 
             case Type::GOLDEN_BUGS:
                 count = std::get<int>(this->_args[0]);
@@ -321,9 +326,16 @@ namespace randomizer::logic::requirement
             }
 
             // Then Twilight...
-            if (argStr == "Twilight")
+            if (argStr == "Twilight Wolf")
             {
-                req._type = Type::TWILIGHT;
+                req._type = Type::TWILIGHT_WOLF;
+                return req;
+            }
+
+            // Then Twilight...
+            if (argStr == "Twilight Human")
+            {
+                req._type = Type::TWILIGHT_HUMAN;
                 return req;
             }
 
@@ -704,8 +716,11 @@ namespace randomizer::logic::requirement
             case Type::WOLF_LINK:
                 return formTime & FormTime::WOLF;
 
-            case Type::TWILIGHT:
-                return formTime & FormTime::TWILIGHT;
+            case Type::TWILIGHT_WOLF:
+                return formTime & FormTime::TWILIGHT_WOLF;
+
+            case Type::TWILIGHT_HUMAN:
+                return formTime & FormTime::TWILIGHT_HUMAN;
 
             case Type::GOLDEN_BUGS:
                 count = std::get<int>(req._args[0]);
@@ -785,12 +800,17 @@ namespace randomizer::logic::requirement
 
         // LOG_TO_DEBUG("Trying " + connectedArea->GetName());
 
+        // We can safely spread Twilight formtimes to this area if the parent area is *not* part
+        // of a Twilight section, or if the parent area and connected area are part of the same
+        // twilight section.
         auto connectedAreaTwilightCleared = connectedArea->TwilightCleared(search);
-        if (!connectedAreaTwilightCleared)
+        if (!connectedAreaTwilightCleared &&
+              (parentArea->TwilightCleared(search) ||
+                parentArea->GetTwilightCompletedMacroIndex() == connectedArea->GetTwilightCompletedMacroIndex()))
         {
             // LOG_TO_DEBUG("Added Twilight");
-            parentAreaFormTime |= FormTime::TWILIGHT;
-            potentialExitFormTimes |= FormTime::TWILIGHT;
+            parentAreaFormTime |= FormTime::TWILIGHT_HUMAN | FormTime::TWILIGHT_WOLF;
+            potentialExitFormTimes |= FormTime::TWILIGHT_HUMAN | FormTime::TWILIGHT_WOLF;
         }
 
         // Calculate the potential form times that we could spread to the connected area. These are the form times
@@ -819,14 +839,22 @@ namespace randomizer::logic::requirement
                 {
                     if (!connectedAreaTwilightCleared)
                     {
-                        if (~connectedAreaFormTime & FormTime::TWILIGHT)
+                        if (~connectedAreaFormTime & FormTime::TWILIGHT_WOLF &&
+                            (formTime & FormTime::WOLF || formTime == FormTime::TWILIGHT_WOLF || exit->IsTwilightGate()))
                         {
-                            // LOG_TO_DEBUG("Spread Twilight to " + connectedArea->GetName());
-                            connectedAreaFormTime |= FormTime::TWILIGHT;
+                            // LOG_TO_DEBUG("Spread Twilight as Wolf " + connectedArea->GetName());
+                            connectedAreaFormTime |= FormTime::TWILIGHT_WOLF;
+                            evalSuccess = EvalSuccess::PARTIAL;
+                        }
+                        else if (~connectedAreaFormTime & FormTime::TWILIGHT_HUMAN &&
+                            (formTime & FormTime::HUMAN || formTime == FormTime::TWILIGHT_HUMAN))
+                        {
+                            // LOG_TO_DEBUG("Spread Twilight as Human to " + connectedArea->GetName());
+                            connectedAreaFormTime |= FormTime::TWILIGHT_HUMAN;
                             evalSuccess = EvalSuccess::PARTIAL;
                         }
                     }
-                    else if (formTime != FormTime::TWILIGHT)
+                    else
                     {
                         // LOG_TO_DEBUG("Spread" + FormTime::to_string(formTime) + " to " + connectedArea->GetName());
                         connectedAreaFormTime |= formTime;
@@ -836,7 +864,7 @@ namespace randomizer::logic::requirement
             }
             else
             {
-                // LOG_TO_DEBUG(FormTime::to_string(formTime) + " is not a potential timespread.");
+                // LOG_TO_DEBUG(FormTime::to_string(formTime) + " is not a potential time spread.");
             }
         }
 
@@ -854,7 +882,7 @@ namespace randomizer::logic::requirement
         return evalSuccess;
     }
 
-    EvalSuccess EvaluateDisconnectedExitRequiremrnt(search::Search* search, entrance::Entrance* exit)
+    EvalSuccess EvaluateDisconnectedExitRequirement(search::Search* search, entrance::Entrance* exit)
     {
         // If the exit is currently disabled, don't try it
         if (exit->IsDisabled())

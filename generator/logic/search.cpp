@@ -355,9 +355,9 @@ namespace randomizer::logic::search
         auto& areaFormTime = this->_areaFormTime[area];
         auto twilightCleared = area->TwilightCleared(this);
 
-        auto shadowCrystal = area->GetWorld()->GetShadowCrystal();
+        auto shadowCrystalObtained = this->_ownedItems.contains(area->GetWorld()->GetShadowCrystal());
         // Check if we can add additional form times to the area
-        if (area->CanChangeTime() && area->CanTransform() && this->_ownedItems.contains(shadowCrystal) && twilightCleared)
+        if (area->CanChangeTime() && area->CanTransform() && shadowCrystalObtained && twilightCleared)
         {
             // LOG_TO_DEBUG("Spread All to " + area->GetName());
             areaFormTime |= FormTime::ALL;
@@ -377,7 +377,7 @@ namespace randomizer::logic::search
             }
         }
         // Same as above except with spreading time spreads the form
-        else if (area->CanTransform() && this->_ownedItems.contains(shadowCrystal) && twilightCleared)
+        else if (area->CanTransform() && shadowCrystalObtained && twilightCleared)
         {
             if (areaFormTime & FormTime::NIGHT)
             {
@@ -389,6 +389,13 @@ namespace randomizer::logic::search
             {
                 // LOG_TO_DEBUG("Spread Human/Wolf to " + area->GetName());
                 areaFormTime |= FormTime::DAY;
+            }
+        }
+        else if (!twilightCleared && area->CanTransform() && shadowCrystalObtained)
+        {
+            if (areaFormTime & FormTime::TWILIGHT_HUMAN || areaFormTime & FormTime::TWILIGHT_WOLF) {
+                // LOG_TO_DEBUG("Spread Human/Wolf Twilight to " + area->GetName());
+                areaFormTime |= FormTime::TWILIGHT_HUMAN | FormTime::TWILIGHT_WOLF;
             }
         }
     }
@@ -417,7 +424,7 @@ namespace randomizer::logic::search
         for (const auto& exit : this->_exitsToTry)
         {
             if (exit->GetConnectedArea() == nullptr &&
-                requirement::EvaluateDisconnectedExitRequiremrnt(this, exit) != requirement::EvalSuccess::NONE)
+                requirement::EvaluateDisconnectedExitRequirement(this, exit) != requirement::EvalSuccess::NONE)
             {
                 return true;
             }
@@ -477,9 +484,13 @@ namespace randomizer::logic::search
             {
                 formTimeStr += " Night";
             }
-            if (areaFormTime & requirement::FormTime::TWILIGHT)
+            if (areaFormTime & requirement::FormTime::TWILIGHT_HUMAN)
             {
-                formTimeStr += " Twilight";
+                formTimeStr += " Twilight Human";
+            }
+            if (areaFormTime & requirement::FormTime::TWILIGHT_WOLF)
+            {
+                formTimeStr += " Twilight Wolf";
             }
 
             worldGraph << "\t\"" << areaName << "\"[label=<" << areaName << formTimeStr << "> shape=\"plain\" fontcolor=\""

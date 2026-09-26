@@ -6,6 +6,7 @@
   Region: Lanayru Field
   Twilight: Lanayru
   Can Warp: True
+  Can Change Time: True
   Locations:
     Lanayru Field Behind Gate Underwater Chest: Iron_Boots
     Lanayru Field Tree Boulder Rupee: Can_Smash
@@ -31,6 +32,7 @@
   Region: Lanayru Field
   Twilight: Lanayru
   Can Warp: True
+  Can Change Time: True
   Exits:
     Zoras Domain West Ledge: Nothing
     Lanayru Field: Can_Smash
@@ -40,6 +42,7 @@
   Region: Lanayru Field
   Twilight: Lanayru
   Can Warp: True
+  Can Change Time: True
   Exits:
     Lanayru Ice Puzzle Cave: Nothing
     Lanayru Field: Can_Smash
@@ -74,6 +77,7 @@
   Region: Lanayru Field
   Twilight: Lanayru
   Can Warp: True
+  Can Change Time: True
   Locations:
     Lanayru Field Spinner Track Chest: Spinner
     Lanayru Field North Spinner Track Boulder Rupee: Can_Smash
@@ -89,6 +93,7 @@
   Region: Beside Castle Town
   Twilight: Lanayru
   Can Warp: True
+  Can Change Time: True
   Locations:
     Castle Town Warp Portal: Nothing
     Hyrule Field Amphitheater Owl Statue Chest: Restored_Dominion_Rod
@@ -111,6 +116,7 @@
   Region: Beside Castle Town
   Twilight: Lanayru
   Can Warp: True
+  Can Change Time: True
   Locations:
     West Hyrule Field Female Butterfly: Nothing
   Exits:
@@ -138,11 +144,12 @@
   Region: Castle Town
   Twilight: Lanayru
   Can Warp: True
+  Can Change Time: True
   Can Transform: If Transform Anywhere
   Locations:
     Charlo Donation Blessing: "'Can_Farm_Lots_of_Rupees'"
   Exits:
-    Castle Town STAR Game: Nothing
+    Castle Town STAR Game: Not_Twilight
     Castle Town Center: Nothing
     Castle Town South: Nothing
     Outside Castle Town West: Nothing
@@ -161,13 +168,14 @@
   Region: Castle Town
   Twilight: Lanayru
   Can Warp: True
+  Can Change Time: True
   Can Transform: If Transform Anywhere
   Locations:
     Castle Town Center Hint Sign: Nothing
   Exits:
     Castle Town Goron House West Door Exterior: Nothing
     Castle Town Goron House East Door Exterior: Nothing
-    Castle Town Malo Mart: Can_Open_Doors and 'Can_Farm_Rupees'
+    Castle Town Malo Mart: Can_Open_Doors and 'Can_Farm_Rupees' and Not_Twilight
     Castle Town North: Nothing
     Castle Town East: Nothing
     Castle Town South: Nothing
@@ -211,6 +219,7 @@
 - Name: Castle Town Goron House Ledge
   Twilight: Lanayru
   Can Transform: If Transform Anywhere
+  Can Change Time: True
   Locations:
     Castle Town Goron Shop Arrow Refill: Can_Complete_Lanayru_Twilight
   Exits:
@@ -229,6 +238,7 @@
   Region: Castle Town
   Twilight: Lanayru
   Can Warp: True
+  Can Change Time: True
   Exits:
     Castle Town North Behind First Door: Can_Complete_MDH
     Castle Town Center: Nothing
@@ -252,6 +262,7 @@
   Region: Castle Town
   Twilight: Lanayru
   Can Warp: True
+  Can Change Time: True
   Exits:
     Castle Town Doctors Office West Door Exterior: Nothing
     Castle Town Doctors Office East Door Exterior: Nothing
@@ -316,6 +327,7 @@
   Map Sector: Lanayru Province
   Region: Castle Town
   Can Warp: True
+  Can Change Time: True
   Locations:
     East Castle Town Bridge Poe: Night and Can_Use_Senses
   Exits:
@@ -327,6 +339,7 @@
   Region: Castle Town
   Twilight: Lanayru
   Can Warp: True
+  Can Change Time: True
   Events:
     Can Buy Hot Spring Water: "'Can_Finish_Goron_Springwater_Rush'"
     Can Learn About Wooden Statue: "'Medicine_Scent'"
@@ -408,6 +421,7 @@
   Region: South of Castle Town
   Twilight: Lanayru
   Can Warp: True
+  Can Change Time: True
   Locations:
     Outside South Castle Town Tightrope Chest: Clawshot and Can_Use_Tightrope
     Outside South Castle Town Fountain Chest: Spinner and Clawshot
@@ -430,6 +444,7 @@
   Region: South of Castle Town
   Twilight: Lanayru
   Can Warp: True
+  Can Change Time: True
   Exits:
     Outside Castle Town South Tektite Grotto: Can_Dig
     Outside Castle Town South: Nothing
@@ -447,6 +462,7 @@
   Region: South of Castle Town
   Twilight: Lanayru
   Can Warp: True
+  Can Change Time: True
   Exits:
     Outside Castle Town South: Can_Use_Hot_Spring_Water and 'Can_Access_Outside_Castle_Town_South'
 
@@ -457,6 +473,7 @@
   Region: Great Bridge of Hylia
   Twilight: Lanayru
   Can Warp: True
+  Can Change Time: True
   Locations:
     Lake Hylia Bridge Vines Chest: Clawshot
     Lake Hylia Bridge Owl Statue Chest: Clawshot and Restored_Dominion_Rod
@@ -469,13 +486,14 @@
     Hyrule Field Near Spinner Rails: Can_Smash
     Flight by Fowl: Can_Open_Doors
     Outside Castle Town West: Nothing
-    Lake Hylia: Twilight
+    Lake Hylia: Twilight_Wolf or Twilight_Human
 
 - Name: Lake Hylia Bridge South
   Map Sector: Lanayru Province
   Region: Great Bridge of Hylia
   Twilight: Lanayru
   Can Warp: True
+  Can Change Time: True
   Locations:
     Lake Hylia Bridge Faron Boulder Rupee: Can_Smash and Not_Twilight
     Lake Hylia Bridge Female Mantis: Not_Twilight and (Clawshot or Gale_Boomerang)
@@ -483,20 +501,21 @@
     Lake Hylia Bridge North: Not_Twilight
     Lake Hylia Bridge Grotto Ledge: Not_Twilight and Can_Launch_Bombs and Clawshot
     Faron Field: Gate_Keys or Small_Keys == Keysy
-    Lake Hylia: Twilight
+    Lake Hylia: Twilight_Wolf or Twilight_Human
 
 - Name: Lake Hylia Bridge Grotto Ledge
   Map Sector: Lanayru Province
   Region: Great Bridge of Hylia
   Twilight: Lanayru
   Can Warp: True
+  Can Change Time: True
   Locations:
     Lake Hylia Bridge Cliff Chest: Not_Twilight
     Lake Hylia Bridge Cliff Poe: Can_Use_Senses and Can_Complete_MDH and Can_Complete_All_Twilight
   Exits:
     Lake Hylia Bridge Bubble Grotto: Not_Twilight and Can_Dig
     Lake Hylia Bridge South: Not_Twilight
-    Lake Hylia: Twilight
+    Lake Hylia: Twilight_Wolf or Twilight_Human
 
 - Name: Lake Hylia Bridge Bubble Grotto
   Locations:
@@ -511,6 +530,7 @@
   Region: Lake Hylia
   Twilight: Lanayru
   Can Warp: True
+  Can Change Time: True
   Events:
     Can Farm Lots of Rupees: Nothing
   Locations:
@@ -539,7 +559,7 @@
     Lake Hylia Lanayru Spring: Nothing
     City in the Sky Entrance: Clawshot and (City_Does_Not_Require_Filled_Skybook == On or count(Progressive_Sky_Book, 7))
     Gerudo Desert: Aurus_Memo
-    Upper Zoras River: Can_Howl or Twilight
+    Upper Zoras River: Can_Howl or Twilight_Wolf
     Kakariko Graveyard Pond: Impossible # To satisfy entrance rando
     Outside Castle Town South: Impossible # To saitisfy entrance rando
 
@@ -549,6 +569,7 @@
   Region: Lake Hylia
   Twilight: Lanayru
   Can Warp: True
+  Can Change Time: True
   Events:
     Howl at Lake Hylia Howling Stone: Can_Howl
   Locations:
@@ -563,6 +584,7 @@
   Map Sector: Lanayru Province
   Region: Lake Hylia
   Can Warp: True
+  Can Change Time: True
   Exits:
     Lake Hylia Long Cave: Nothing
     Lake Hylia: Can_Smash
@@ -602,6 +624,7 @@
   Region: Lake Hylia
   Twilight: Lanayru
   Can Warp: True
+  Can Change Time: True
   Locations:
     Outside Lanayru Spring Left Statue Chest: Can_Talk_to_Humans and 'Can_Farm_Rupees'
     Outside Lanayru Spring Right Statue Chest: Can_Talk_to_Humans and 'Can_Farm_Rupees'
@@ -622,6 +645,7 @@
   Region: Lake Hylia
   Twilight: Lanayru
   Can Warp: True
+  Can Change Time: True
   Locations:
     Flight By Fowl Ledge Poe: Night and Can_Use_Senses
   Exits:
@@ -639,6 +663,9 @@
   Region: Lanayru Spring
   Twilight: Lanayru
   Can Warp: True
+  Can Change Time: True
+  Events:
+    Can Start Lanayru Twilight: Can_Complete_Eldin_Twilight and (Twilight_Wolf or Twilight_Human)
   Locations:
     Lanayru Spring Underwater Left Chest: Iron_Boots or (Can_Do_Niche_Stuff and Magic_Armor)
     Lanayru Spring Underwater Right Chest: Iron_Boots or (Can_Do_Niche_Stuff and Magic_Armor)
@@ -657,6 +684,7 @@
   Map Sector: Lanayru Province
   Region: Lake Hylia
   Twilight: Lanayru
+  Can Change Time: True
   Exits:
     Lakebed Temple Entrance: Nothing
     Lake Hylia: Zora_Armor and ((Lakebed_Does_Not_Require_Water_Bombs == On) or (Iron_Boots and Water_Bombs))
@@ -669,6 +697,7 @@
   Region: Upper Zoras River
   Twilight: Lanayru
   Can Warp: True
+  Can Change Time: True
   Events:
     Howl at Upper Zoras River Howling Stone: Can_Howl
   Locations:
@@ -692,6 +721,7 @@
   Map Sector: Lanayru Province
   Region: Upper Zoras River
   Twilight: Lanayru
+  Can Change Time: True
   Exits:
     Zoras Domain To Upper Zoras River (On Land): Nothing
     Upper Zoras River: Nothing
@@ -700,6 +730,7 @@
   Map Sector: Lanayru Province
   Region: Upper Zoras River
   Twilight: Lanayru
+  Can Change Time: True
   Exits:
     Zoras Domain To Upper Zoras River (Swimming): Nothing
     Upper Zoras River: Nothing
@@ -708,6 +739,7 @@
   Map Sector: Lanayru Province
   Region: Upper Zoras River
   Twilight: Lanayru
+  Can Change Time: True
   Exits:
     Zoras Domain To Upper Zoras River (Underwater): Iron_Boots or Zora_Armor
     Upper Zoras River: Nothing
@@ -724,6 +756,7 @@
   Map Sector: Lanayru Province
   Region: Upper Zoras River
   Can Warp: True
+  Can Change Time: True
   Locations:
     Fishing Hole Heart Piece: Clawshot
     Fishing Hole Bottle: Fishing_Rod
@@ -745,6 +778,7 @@
   Region: Zoras Domain
   Twilight: Lanayru
   Can Warp: True
+  Can Change Time: True
   Events:
     Reekfish Scent: Coral_Earring
   Locations:
@@ -759,8 +793,8 @@
     Zoras Domain Twilit Insect near Lilypads 2: Can_Defeat_Lanayru_Twilit_Insect
     Zoras Domain Burrowing Twilit Insect: Can_Defeat_Lanayru_Twilit_Insect  
   Exits:
-    Zoras Domain West Ledge: Clawshot or Can_Midna_Jump or Twilight
-    Zoras Domain Top of Waterfall: Clawshot or Can_Midna_Jump or Twilight
+    Zoras Domain West Ledge: Clawshot or Can_Midna_Jump or Twilight_Wolf
+    Zoras Domain Top of Waterfall: Clawshot or Can_Midna_Jump or Twilight_Wolf
     Snowpeak Climb Lower: Not_Twilight
     Zoras Domain To Upper Zoras River (On Land): Nothing
     Zoras Domain To Upper Zoras River (Swimming): Nothing
@@ -770,6 +804,7 @@
   Map Sector: Lanayru Province
   Region: Zoras Domain
   Twilight: Lanayru
+  Can Change Time: True
   Exits:
     Upper Zoras River To Zoras Domain (On Land): Nothing
     Zoras Domain: Nothing
@@ -778,6 +813,7 @@
   Map Sector: Lanayru Province
   Region: Zoras Domain
   Twilight: Lanayru
+  Can Change Time: True
   Exits:
     Upper Zoras River To Zoras Domain (Swimming): Nothing
     Zoras Domain: Nothing
@@ -786,6 +822,7 @@
   Map Sector: Lanayru Province
   Region: Zoras Domain
   Twilight: Lanayru
+  Can Change Time: True
   Exits:
     Upper Zoras River To Zoras Domain (Underwater): Nothing
     Zoras Domain: Iron_Boots or Zora_Armor
@@ -795,6 +832,7 @@
   Region: Zoras Domain
   Twilight: Lanayru
   Can Warp: True
+  Can Change Time: True
   Locations:
     Zoras Domain Twilit Insect on West Ledge: Can_Defeat_Lanayru_Twilit_Insect
     Zoras Domain Hint Sign: Nothing
@@ -808,6 +846,7 @@
   Region: Zoras Domain
   Twilight: Lanayru
   Can Warp: True
+  Can Change Time: True
   Locations:
     Zoras Domain Behind Waterfall Rupee: Can_Complete_Lanayru_Twilight
     Zoras Domain Top Ledge Rupee: Can_Complete_Lanayru_Twilight
@@ -828,6 +867,7 @@
   Map Sector: Lanayru Province
   Region: Zoras Domain
   Twilight: Lanayru
+  Can Change Time: True
   Exits:
     Zoras Domain Top of Waterfall: Nothing
     Zoras Throne Room Center: Nothing
@@ -836,6 +876,7 @@
   Map Sector: Lanayru Province
   Region: Zoras Domain
   Twilight: Lanayru
+  Can Change Time: True
   Exits:
     Zoras Domain Top of Waterfall: Nothing
     Zoras Throne Room West: Nothing
@@ -844,6 +885,7 @@
   Map Sector: Lanayru Province
   Region: Zoras Domain
   Twilight: Lanayru
+  Can Change Time: True
   Exits:
     Zoras Domain Top of Waterfall: Nothing
     Zoras Throne Room East: Iron_Boots or Zora_Armor
@@ -852,6 +894,7 @@
   Map Sector: Lanayru Province
   Region: Zoras Domain
   Twilight: Lanayru
+  Can Change Time: True
   Exits:
     Zoras Domain Top of Waterfall: Nothing
     Zoras Throne Room Underwater: Iron_Boots or Zora_Armor
@@ -861,6 +904,7 @@
   Region: Zoras Domain
   Twilight: Lanayru
   Can Warp: True
+  Can Change Time: True
   Locations:
     Zoras Domain Warp Portal: Nothing
     Zoras Domain Light All Torches Chest: Can_Light_Torches and Iron_Boots
@@ -883,6 +927,7 @@
   Map Sector: Lanayru Province
   Region: Zoras Domain
   Twilight: Lanayru
+  Can Change Time: True
   Exits:
     Zoras Domain Top of Waterfall Center: Nothing
     Zoras Throne Room: Nothing
@@ -891,6 +936,7 @@
   Map Sector: Lanayru Province
   Region: Zoras Domain
   Twilight: Lanayru
+  Can Change Time: True
   Exits:
     Zoras Domain Top of Waterfall West: Nothing
     Zoras Throne Room: Nothing
@@ -899,6 +945,7 @@
   Map Sector: Lanayru Province
   Region: Zoras Domain
   Twilight: Lanayru
+  Can Change Time: True
   Exits:
     Zoras Domain Top of Waterfall East: Nothing
     Zoras Throne Room: Nothing
@@ -907,6 +954,7 @@
   Map Sector: Lanayru Province
   Region: Zoras Domain
   Twilight: Lanayru
+  Can Change Time: True
   Exits:
     Zoras Domain Top of Waterfall Underwater: Nothing
     Zoras Throne Room: Iron_Boots or Zora_Armor
