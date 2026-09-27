@@ -2264,8 +2264,9 @@ std::vector<overlay::Line> overlay_lines() {
         const int me = g_client.slot();
         const Hint* top = nullptr;
         size_t open = 0;
+        // Anything that concerns us: our items wherever they are, and anyone's items in our world.
         for (const auto& h : g_hints) {
-            if (h.receivingPlayer == me && !h.found) {
+            if ((h.receivingPlayer == me || h.findingPlayer == me) && !h.found) {
                 ++open;
                 top = top == nullptr ? &h : top;  // g_hints is sorted, priority first
             }
@@ -2273,11 +2274,13 @@ std::vector<overlay::Line> overlay_lines() {
         if (open > 0) {
             section();
             out.push_back(Line::text("Hints", kOvText, fmt::format("{} open", open), kOvYellow));
+            // Right column: whose world it's in for our items, whose item it is for theirs.
+            const std::string who = top->receivingPlayer == me
+                ? (top->findingPlayer == me ? "your world" : ascii_only(player_label(top->findingPlayer), 16))
+                : "for " + ascii_only(player_label(top->receivingPlayer), 12);
             out.push_back(Line::text(
                 ascii_only(g_client.itemName(top->item, top->receivingPlayer), kChars),
-                top->status == 30 ? kOvYellow : kOvText,
-                top->findingPlayer == me ? "you" : ascii_only(player_label(top->findingPlayer), 16),
-                kOvDim, true));
+                top->status == 30 ? kOvYellow : kOvText, who, kOvDim, true));
             out.push_back(Line::text(
                 ascii_only(g_client.locationName(top->location, top->findingPlayer), kChars + 6),
                 kOvDim, {}, kOvDim, true));
