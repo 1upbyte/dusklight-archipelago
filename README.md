@@ -208,7 +208,9 @@ The randomizer, its logic data and its generator are by [Twilit Realm](https://g
 This fork adds the Archipelago game mode, the network client and the apworld.
 
 Emoji graphics are [Twemoji](https://github.com/jdecked/twemoji), licensed under
-[CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/) (see `res/emoji/LICENSE.txt`).
+[CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/) (see `res/emoji/LICENSE.txt`), and the
+emoji font is [Twemoji Mozilla](https://github.com/mozilla/twemoji-colr) (Apache 2.0, graphics
+CC-BY 4.0; see `res/fonts/LICENSE.txt`).
 
 ## AI disclosure
 
