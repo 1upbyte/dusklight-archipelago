@@ -224,6 +224,25 @@ std::string emojify(std::string_view s) {
     return out;
 }
 
+std::string glyph(std::string_view file) {
+    std::string out;
+    size_t count = 0;
+    for (size_t start = 0; start <= file.size();) {
+        const size_t dash = std::min(file.find('-', start), file.size());
+        encode(static_cast<uint32_t>(
+                   std::stoul(std::string{file.substr(start, dash - start)}, nullptr, 16)),
+            out);
+        ++count;
+        start = dash + 1;
+    }
+    // Single codepoints from the older blocks (heart, sun, crossed swords...) read as plain
+    // text symbols unless asked for emoji presentation.
+    if (count == 1 && file.size() <= 4) {
+        encode(kVs16, out);
+    }
+    return out;
+}
+
 std::string shortcodes_to_unicode(std::string_view s) {
     std::string out;
     out.reserve(s.size());
@@ -235,20 +254,7 @@ std::string shortcodes_to_unicode(std::string_view s) {
             out += s[i++];
             continue;
         }
-        size_t count = 0;
-        for (size_t start = 0; start <= file.size();) {
-            const size_t dash = std::min(file.find('-', start), file.size());
-            encode(static_cast<uint32_t>(std::stoul(std::string{file.substr(start, dash - start)},
-                       nullptr, 16)),
-                out);
-            ++count;
-            start = dash + 1;
-        }
-        // Single codepoints from the older blocks (heart, sun, crossed swords...) read as plain
-        // text symbols unless asked for emoji presentation.
-        if (count == 1 && file.size() <= 4) {
-            encode(kVs16, out);
-        }
+        out += glyph(file);
         i += skip;
     }
     return out;

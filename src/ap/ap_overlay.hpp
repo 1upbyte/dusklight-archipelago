@@ -11,19 +11,52 @@
 namespace ap::overlay {
 
 struct Line {
-    std::string text;       // printable ASCII only: the game's font has little else
-    uint32_t rgba = 0xFFFFFFFF;
-    float bar = -1.0f;      // >= 0: a progress bar filled to this fraction instead of text
+    enum class Kind { Text, Bar, Divider };
+    Kind kind = Kind::Text;
+    // Text: `left` from the left edge, `right` against the right edge (either may be empty).
+    // Printable ASCII only: the game's font has little else.
+    std::string left;
+    std::string right;
+    uint32_t leftColor = 0xF2EEE2FF;  // RGBA
+    uint32_t rightColor = 0xA9A493FF;
+    bool small = false;               // secondary line, drawn smaller
+    // Bar: filled to `fill` (0..1) in `barColor`.
+    float fill = 0.0f;
+    uint32_t barColor = 0x6FD08CFF;
+
+    static Line text(std::string l, uint32_t lc, std::string r = {}, uint32_t rc = 0xA9A493FF,
+        bool small = false) {
+        Line line;
+        line.left = std::move(l);
+        line.right = std::move(r);
+        line.leftColor = lc;
+        line.rightColor = rc;
+        line.small = small;
+        return line;
+    }
+    static Line bar(float fill, uint32_t color) {
+        Line line;
+        line.kind = Kind::Bar;
+        line.fill = fill;
+        line.barColor = color;
+        return line;
+    }
+    static Line divider() {
+        Line line;
+        line.kind = Kind::Divider;
+        return line;
+    }
 };
 
 enum class Corner { TopLeft, TopRight, MiddleLeft, MiddleRight, BottomLeft, BottomRight };
 
 struct Layout {
     Corner corner = Corner::MiddleRight;
-    float offsetX = 0.0f;   // away from the chosen edge
+    float offsetX = 0.0f;   // away from the chosen side
     float offsetY = 0.0f;   // down (top/middle) or up (bottom)
     float scale = 1.0f;
     uint8_t backgroundAlpha = 160;
+    uint32_t accent = 0x6FD08CFF;  // the strip down the panel's left edge (connection status)
 };
 
 // Call from the HUD draw hook only (it needs the game's current graphics port).

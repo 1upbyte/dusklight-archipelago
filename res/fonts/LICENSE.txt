@@ -1,0 +1,5 @@
+Twemoji.Mozilla.ttf: Twemoji COLR font v0.7.0, https://github.com/mozilla/twemoji-colr
+Font build code copyright 2016-2018 Mozilla Foundation, Apache License 2.0.
+Emoji graphics: Twemoji, copyright Twitter, Inc and other contributors,
+licensed under CC-BY 4.0: https://creativecommons.org/licenses/by/4.0/
+Unchanged. Loaded as a fallback font so the game's UI can show emoji.

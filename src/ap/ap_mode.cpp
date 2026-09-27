@@ -197,9 +197,13 @@ uint64_t g_selectedHint = 0;        // hint_key() of the hint shown in the detai
 std::string g_hintItemDraft;
 std::string g_hintLocationDraft;
 
+// Emoji font (see load_emoji_font): when it's loaded, every UI string can show emoji as text
+bool g_emojiFont = false;
+
 // Overlay (see "Overlay" below): settings are config vars, so they persist and bind to the tab
 struct Recent {
-    std::string text;
+    std::string item;  // the item, or the whole chat line
+    std::string from;  // who sent the item (empty for chat)
     std::chrono::steady_clock::time_point at;
 };
 std::deque<Recent> g_recentItems;
@@ -262,8 +266,10 @@ const std::string& item_name(int id) {
 void toast(const std::string& title, const std::string& body, const char* type = nullptr,
     uint32_t ms = 0) {
     // Server chat and refusal messages land here, so bound what we are willing to render.
-    const std::string t = emoji::emojify(rml_escape(message_safe(title, 80)));
-    const std::string b = emoji::emojify(rml_escape(message_safe(body, 400)));
+    // No emoji images here: toasts don't render <img>. With the emoji font loaded, emoji in
+    // the text show by themselves.
+    const std::string t = rml_escape(message_safe(title, 80));
+    const std::string b = rml_escape(message_safe(body, 400));
     UiToastDesc desc{sizeof(UiToastDesc)};
     desc.type = type;
     desc.title_rml = t.c_str();
@@ -751,7 +757,7 @@ void on_print(const std::string& text, const json& msg) {
         toast("Archipelago", text, nullptr, 4000);
     } else if (type == "Chat" || type == "ServerChat") {
         toast("Archipelago", text, nullptr, 5000);
-        g_recentChat.push_back({text, std::chrono::steady_clock::now()});
+        g_recentChat.push_back({text, {}, std::chrono::steady_clock::now()});
         while (g_recentChat.size() > 8) {
             g_recentChat.pop_front();
         }
@@ -1136,8 +1142,7 @@ void deliver_items() {
     g_outstanding = give;
     {
         const std::string sender = g_client.playerName(it.player);
-        g_recentItems.push_back({fmt::format("+ {}{}", item_name(give),
-                                     fromOther && !sender.empty() ? " (" + sender + ")" : ""),
+        g_recentItems.push_back({item_name(give), fromOther ? sender : std::string{},
             std::chrono::steady_clock::now()});
         while (g_recentItems.size() > 8) {
             g_recentItems.pop_front();
@@ -1777,6 +1782,61 @@ std::string log_rml_all() {
     return out;
 }
 
+// The game's UI (RmlUi) has no emoji glyphs, and the mod API has no way to add fonts. RmlUi's
+// own LoadFontFace is in the game's symbol manifest though, so resolve it by name (the way
+// other mods reach host functions) and register Twemoji as a fallback face. It's a COLR font,
+// which the game's FreeType renders in color. If anything here fails, emoji stay as images in
+// the message log and as :codes: in the picker.
+bool load_emoji_font() {
+    static int state = 0;  // 0 untried, 1 loaded, 2 failed
+    if (state != 0) {
+        return state == 1;
+    }
+    state = 2;
+    using LoadFontFaceFn = bool (*)(const std::string& path, bool fallback, uint16_t weight, int face);
+    static constexpr const char* kNames[] = {
+        // bool Rml::LoadFontFace(const String&, bool fallback_face, Style::FontWeight, int)
+        "?LoadFontFace@Rml@@YA_NAEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@"
+        "_NW4FontWeight@Style@1@H@Z",
+        "_ZN3Rml12LoadFontFaceERKNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEEbNS_5Style1"
+        "0FontWeightEi",
+        "_ZN3Rml12LoadFontFaceERKNSt3__112basic_stringIcNS0_11char_traitsIcEENS0_9allocatorIcEEEE"
+        "bNS_5Style10FontWeightEi",
+    };
+    void* address = nullptr;
+    for (const char* name : kNames) {
+        if (svc_mng.hook->resolve(svc_mng.mod_ctx, name, &address, nullptr) == MOD_OK &&
+            address != nullptr) {
+            break;
+        }
+        address = nullptr;
+    }
+    if (address == nullptr) {
+        ap_log("emoji font: Rml::LoadFontFace not found in the symbol manifest");
+        return false;
+    }
+    ResourceBuffer font = RESOURCE_BUFFER_INIT;
+    if (svc_mng.resource->load(svc_mng.mod_ctx, "fonts/Twemoji.Mozilla.ttf", &font) != MOD_OK ||
+        font.data == nullptr) {
+        ap_log("emoji font: res/fonts/Twemoji.Mozilla.ttf missing from the bundle");
+        return false;
+    }
+    // LoadFontFace reads from a file, so keep a copy next to the mod's other data.
+    namespace fs = std::filesystem;
+    const fs::path path = randomizer::paths::GetRandomizerPath() / "archipelago" / "Twemoji.Mozilla.ttf";
+    std::error_code ec;
+    fs::create_directories(path.parent_path(), ec);
+    if (!fs::exists(path, ec) || fs::file_size(path, ec) != font.size) {
+        std::ofstream(path, std::ios::binary)
+            .write(static_cast<const char*>(font.data), static_cast<std::streamsize>(font.size));
+    }
+    svc_mng.resource->free(svc_mng.mod_ctx, &font);
+    const bool ok = reinterpret_cast<LoadFontFaceFn>(address)(path.generic_string(), true, 0, 0);
+    ap_log(ok ? "emoji font: loaded" : "emoji font: LoadFontFace refused the file");
+    state = ok ? 1 : 2;
+    return ok;
+}
+
 bool not_connected(ModContext*, void*) {
     return g_client.state() != State::Connected;
 }
@@ -1794,28 +1854,37 @@ void send_chat(ModContext*, void*) {
 }
 
 ModResult build_emoji_picker(ModContext* ctx, UiElementHandle pane, void*, ModError*) {
-    svc_mng.ui->pane_add_text(ctx, pane, "Pick one to add it to your message.", nullptr);
+    svc_mng.ui->pane_add_section(ctx, pane, "Emoji");
     UiRowDesc rowDesc = UI_ROW_DESC_INIT;
     rowDesc.wrap = true;
     UiElementHandle row = 0;
     svc_mng.ui->pane_add_row(ctx, pane, &rowDesc, &row);
+    static std::vector<std::string> labels;
+    labels.clear();
+    labels.reserve(emoji::picker().size());
     for (const auto& e : emoji::picker()) {
+        // With the emoji font the button is just the emoji; without it, an image behind the name.
+        labels.push_back(g_emojiFont ? emoji::glyph(e.file) : std::string{e.name});
         UiControlDesc b = UI_CONTROL_DESC_INIT;
         b.kind = UI_CONTROL_BUTTON;
-        b.label = e.name;
+        b.label = labels.back().c_str();
+        b.tooltip = e.name;
         b.user_data = const_cast<emoji::PickerEmoji*>(&e);
         b.on_pressed = [](ModContext*, void* ud) {
             const auto* pick = static_cast<const emoji::PickerEmoji*>(ud);
             if (!g_chatDraft.empty() && g_chatDraft.back() != ' ') {
                 g_chatDraft += ' ';
             }
-            g_chatDraft += fmt::format(":{}: ", pick->name);
+            g_chatDraft += g_emojiFont ? emoji::glyph(pick->file) + " "
+                                       : fmt::format(":{}: ", pick->name);
         };
         UiElementHandle elem = 0;
         svc_mng.ui->pane_add_control(ctx, row, &b, &elem);
         if (elem != 0) {
-            svc_mng.ui->elem_set_class(ctx, elem, "ap-emoji-btn", true);
-            svc_mng.ui->elem_set_class(ctx, elem, fmt::format("ap-e-{}", e.file).c_str(), true);
+            svc_mng.ui->elem_set_class(ctx, elem, g_emojiFont ? "ap-emoji-glyph" : "ap-emoji-btn", true);
+            if (!g_emojiFont) {
+                svc_mng.ui->elem_set_class(ctx, elem, fmt::format("ap-e-{}", e.file).c_str(), true);
+            }
         }
     }
     return MOD_OK;
@@ -1823,6 +1892,7 @@ ModResult build_emoji_picker(ModContext* ctx, UiElementHandle pane, void*, ModEr
 
 ModResult build_messages_tab(ModContext* ctx, UiWindowHandle, UiElementHandle left,
     UiElementHandle right, void*, ModError*) {
+    svc_mng.ui->pane_add_section(ctx, left, "Chat");
     UiControlDesc say = UI_CONTROL_DESC_INIT;
     say.kind = UI_CONTROL_STRING;
     say.label = "Message";
@@ -1834,25 +1904,24 @@ ModResult build_messages_tab(ModContext* ctx, UiWindowHandle, UiElementHandle le
     say.is_disabled = not_connected;
     svc_mng.ui->pane_add_control(ctx, left, &say, nullptr);
 
-    UiRowDesc rowDesc = UI_ROW_DESC_INIT;
-    UiElementHandle row = 0;
-    svc_mng.ui->pane_add_row(ctx, left, &rowDesc, &row);
     UiControlDesc send = UI_CONTROL_DESC_INIT;
     send.kind = UI_CONTROL_BUTTON;
     send.label = "Send";
     send.on_pressed = send_chat;
     send.is_disabled = not_connected;
-    svc_mng.ui->pane_add_control(ctx, row, &send, nullptr);
+    svc_mng.ui->pane_add_control(ctx, left, &send, nullptr);
+    // A group button has to sit directly in the tab's left pane; the host rejects one in a row.
     UiGroupDesc picker = UI_GROUP_DESC_INIT;
     picker.label = "Emoji";
     picker.build = build_emoji_picker;
-    svc_mng.ui->pane_add_group(ctx, row, right, &picker, nullptr);
+    svc_mng.ui->pane_add_group(ctx, left, right, &picker, nullptr);
     // Guidance as text rather than help_rml: a control's help would replace the picker.
-    svc_mng.ui->pane_add_text(ctx, left,
-        "Chat with the room, or send a server command such as !remaining or !help. Emoji codes "
-        "like :joy: go out as the emoji.",
+    svc_mng.ui->pane_add_rml(ctx, left,
+        R"(<div class="ap-quiet">Chat with the room, or send a command such as !remaining or )"
+        R"(!help. Codes like :joy: go out as the emoji.</div>)",
         nullptr);
 
+    svc_mng.ui->pane_add_section(ctx, left, "Room");
     g_logElem = 0;
     svc_mng.ui->pane_add_rml(ctx, left, log_rml_all().c_str(), &g_logElem);
     g_logShown = g_logVersion;
@@ -2022,9 +2091,10 @@ ModResult build_hints_tab(ModContext* ctx, UiWindowHandle, UiElementHandle left,
 
     // No help_rml on this tab's controls: a control's help replaces the right pane, and that's
     // where the hint details and priority buttons live.
-    svc_mng.ui->pane_add_text(ctx, left,
-        "Ask where one of your items is, or what's at one of your locations. Each hint costs "
-        "hint points.",
+    svc_mng.ui->pane_add_section(ctx, left, "Ask for a hint");
+    svc_mng.ui->pane_add_rml(ctx, left,
+        R"(<div class="ap-quiet">Where one of your items is, or what's at one of your )"
+        R"(locations. Each hint costs hint points.</div>)",
         nullptr);
     struct Ask {
         const char* label;
@@ -2059,7 +2129,7 @@ ModResult build_hints_tab(ModContext* ctx, UiWindowHandle, UiElementHandle left,
         svc_mng.ui->pane_add_control(ctx, left, &go, nullptr);
     }
 
-    svc_mng.ui->pane_add_section(ctx, left, "Hints");
+    svc_mng.ui->pane_add_section(ctx, left, "Your hints");
     UiListDesc list = UI_LIST_DESC_INIT;
     list.on_pressed = [](ModContext* c, UiListHandle, uint64_t key, void*) {
         g_selectedHint = key;
@@ -2128,12 +2198,28 @@ int64_t cfg_int(ConfigVarHandle h, int64_t fallback) {
     return v;
 }
 
+constexpr uint32_t kOvText = 0xF2EEE2FF, kOvDim = 0xA9A493FF, kOvGreen = 0x6FD08CFF,
+                   kOvYellow = 0xE8C867FF, kOvRed = 0xE8837AFF, kOvBlue = 0x9DB8FFFF;
+
+uint32_t overlay_accent() {
+    switch (g_client.state()) {
+    case State::Connected: return kOvGreen;
+    case State::Connecting:
+    case State::Handshaking: return kOvYellow;
+    default: return kOvRed;
+    }
+}
+
 std::vector<overlay::Line> overlay_lines() {
     using overlay::ascii_only;
-    constexpr uint32_t kWhite = 0xFFFFFFFF, kGreen = 0x6FD08CFF, kYellow = 0xE8C867FF,
-                       kRed = 0xFA8072FF, kGray = 0xC8C8C8FF, kBlue = 0x9DB8FFFF;
-    constexpr size_t kChars = 44;
-    std::vector<overlay::Line> out;
+    using overlay::Line;
+    constexpr size_t kChars = 34;
+    std::vector<Line> out;
+    auto section = [&] {
+        if (!out.empty()) {
+            out.push_back(Line::divider());
+        }
+    };
     const auto now = std::chrono::steady_clock::now();
     const int64_t keep = cfg_int(g_ovKeep, 30);
     auto fresh = [&](const Recent& r) {
@@ -2141,29 +2227,37 @@ std::vector<overlay::Line> overlay_lines() {
     };
 
     if (cfg_on(g_ovStatus)) {
-        switch (g_client.state()) {
-        case State::Connected: out.push_back({"Archipelago: connected", kGreen}); break;
-        case State::Connecting:
-        case State::Handshaking: out.push_back({"Archipelago: connecting...", kYellow}); break;
-        default: out.push_back({"Archipelago: offline", kRed}); break;
-        }
+        const char* state = g_client.state() == State::Connected ? "connected"
+                            : g_client.state() == State::Connecting ||
+                                      g_client.state() == State::Handshaking
+                                ? "connecting"
+                                : "offline";
+        out.push_back(Line::text("Archipelago", kOvText, state, overlay_accent()));
     }
     if (cfg_on(g_ovChecks) && g_haveSlot) {
         const auto n = region_counts(-1);
-        std::string text = fmt::format("Checks {}/{}", n.done, n.total);
+        section();
+        out.push_back(Line::text("Checks", kOvText, fmt::format("{} / {}", n.done, n.total), kOvText));
+        out.push_back(Line::bar(n.total == 0 ? 0.0f : static_cast<float>(n.done) / n.total, kOvGreen));
         if (g_logic && g_reachInputs != SIZE_MAX) {
-            text += fmt::format("   {} in logic", n.inLogic);
+            out.push_back(Line::text("In logic now", kOvDim, std::to_string(n.inLogic),
+                n.inLogic > 0 ? kOvGreen : kOvDim, true));
         }
-        out.push_back({text, kWhite});
-        out.push_back({"", kGreen, n.total == 0 ? 0.0f : static_cast<float>(n.done) / n.total});
     }
     if (cfg_on(g_ovItems)) {
         int64_t left = std::clamp<int64_t>(cfg_int(g_ovItemCount, 3), 1, 8);
+        bool first = true;
         for (auto it = g_recentItems.rbegin(); it != g_recentItems.rend() && left > 0; ++it) {
-            if (fresh(*it)) {
-                out.push_back({ascii_only(it->text, kChars), kBlue});
-                --left;
+            if (!fresh(*it)) {
+                continue;
             }
+            if (first) {
+                section();
+                first = false;
+            }
+            out.push_back(Line::text(ascii_only(it->item, kChars), kOvBlue,
+                ascii_only(it->from, 16), kOvDim));
+            --left;
         }
     }
     if (cfg_on(g_ovHints) && g_client.state() == State::Connected) {
@@ -2177,12 +2271,16 @@ std::vector<overlay::Line> overlay_lines() {
             }
         }
         if (open > 0) {
-            out.push_back({fmt::format("Hints: {} open", open), kYellow});
-            out.push_back({ascii_only(fmt::format("{}{} - {}", top->status == 30 ? "! " : "",
-                                          g_client.itemName(top->item, top->receivingPlayer),
-                                          g_client.locationName(top->location, top->findingPlayer)),
-                               kChars),
-                kGray});
+            section();
+            out.push_back(Line::text("Hints", kOvText, fmt::format("{} open", open), kOvYellow));
+            out.push_back(Line::text(
+                ascii_only(g_client.itemName(top->item, top->receivingPlayer), kChars),
+                top->status == 30 ? kOvYellow : kOvText,
+                top->findingPlayer == me ? "you" : ascii_only(player_label(top->findingPlayer), 16),
+                kOvDim, true));
+            out.push_back(Line::text(
+                ascii_only(g_client.locationName(top->location, top->findingPlayer), kChars + 6),
+                kOvDim, {}, kOvDim, true));
         }
     }
     if (cfg_on(g_ovChat)) {
@@ -2192,12 +2290,16 @@ std::vector<overlay::Line> overlay_lines() {
                 lines.push_back(&*it);
             }
         }
+        if (!lines.empty()) {
+            section();
+        }
         for (auto it = lines.rbegin(); it != lines.rend(); ++it) {  // oldest of them first
-            out.push_back({ascii_only((*it)->text, kChars), kGray});
+            out.push_back(Line::text(ascii_only((*it)->item, kChars + 6), kOvDim, {}, kOvDim, true));
         }
     }
     if (cfg_on(g_ovDeathLink) && death_link_on()) {
-        out.push_back({"Death link on", kRed});
+        section();
+        out.push_back(Line::text("Death link", kOvRed, "on", kOvRed, true));
     }
     return out;
 }
@@ -2213,6 +2315,7 @@ void post_meter2_draw(ModContext*, void*, void*, void*) {
     layout.scale = static_cast<float>(cfg_int(g_ovScale, 100)) / 100.0f;
     layout.backgroundAlpha =
         static_cast<uint8_t>(std::clamp<int64_t>(cfg_int(g_ovOpacity, 60), 0, 100) * 255 / 100);
+    layout.accent = overlay_accent();
     overlay::draw_panel(overlay_lines(), layout);
 }
 
@@ -2275,10 +2378,14 @@ ModResult build_overlay_tab(ModContext* ctx, UiWindowHandle, UiElementHandle lef
     add_bound(ctx, left, UI_CONTROL_TOGGLE, "Show overlay", g_ovEnabled,
         "A small panel of Archipelago info on screen while you play. It hides whenever the "
         "game's own HUD does.");
+    svc_mng.ui->pane_add_section(ctx, left, "Placement");
     add_bound(ctx, left, UI_CONTROL_SELECT, "Position", g_ovCorner);
-    add_bound(ctx, left, UI_CONTROL_NUMBER, "Distance from the side", g_ovX, nullptr, 0, 600, 5);
-    add_bound(ctx, left, UI_CONTROL_NUMBER, "Distance from top or bottom", g_ovY,
-        "For the middle positions this moves the panel down (or up, below zero).", -400, 400, 5);
+    add_bound(ctx, left, UI_CONTROL_NUMBER, "Horizontal offset", g_ovX,
+        "How far the panel sits from its side of the screen.", 0, 600, 5);
+    add_bound(ctx, left, UI_CONTROL_NUMBER, "Vertical offset", g_ovY,
+        "How far it sits from the top or bottom. For the middle positions this moves it down, or "
+        "up below zero.",
+        -400, 400, 5);
     add_bound(ctx, left, UI_CONTROL_NUMBER, "Size", g_ovScale, nullptr, 50, 200, 10, "%");
     add_bound(ctx, left, UI_CONTROL_NUMBER, "Background", g_ovOpacity, nullptr, 0, 100, 10, "%");
     svc_mng.ui->pane_add_section(ctx, left, "Show");
@@ -2293,7 +2400,7 @@ ModResult build_overlay_tab(ModContext* ctx, UiWindowHandle, UiElementHandle lef
     add_bound(ctx, left, UI_CONTROL_TOGGLE, "Chat", g_ovChat, "The last few chat messages.");
     add_bound(ctx, left, UI_CONTROL_TOGGLE, "Death link", g_ovDeathLink,
         "A reminder while death link is on.");
-    add_bound(ctx, left, UI_CONTROL_NUMBER, "Keep items and chat for", g_ovKeep,
+    add_bound(ctx, left, UI_CONTROL_NUMBER, "Fade items and chat after", g_ovKeep,
         "0 keeps them until newer ones push them out.", 0, 300, 5, " s");
     return MOD_OK;
 }
@@ -2421,6 +2528,7 @@ void open_status_window(ModContext*, void*) {
     static const std::string rcss = [] {
         std::string out = kWindowRcss;
         out += ".ap-emoji-btn { padding-left: 42dp; font-size: 15dp; text-align: left; }\n";
+        out += ".ap-emoji-glyph { font-size: 26dp; min-width: 52dp; padding: 4dp 8dp; }\n";
         for (const auto& e : emoji::picker()) {
             out += fmt::format(".ap-e-{} {{ decorator: image({} contain left center); }}\n", e.file,
                 emoji::image_source(e.file));
@@ -2517,6 +2625,7 @@ ModResult activate() {
         mods::log::error("archipelago: transform anywhere hooks failed to install; turn on "
                          "Dusklight's Can Transform Anywhere cheat instead");
     }
+    g_emojiFont = load_emoji_font();
     if (mods::hook::add_post<ApMeter2Draw>(post_meter2_draw) != MOD_OK) {
         mods::log::error("archipelago: overlay hook failed to install; the overlay won't show");
     }

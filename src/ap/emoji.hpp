@@ -36,4 +36,7 @@ const std::vector<PickerEmoji>& picker();
 // mod:// source of res/emoji/<file>.png.
 std::string image_source(std::string_view file);
 
+// The emoji itself (UTF-8) for a picker file name, with emoji presentation where it needs it.
+std::string glyph(std::string_view file);
+
 }  // namespace ap::emoji
