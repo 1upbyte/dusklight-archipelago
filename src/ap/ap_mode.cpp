@@ -1,6 +1,7 @@
 #include "ap_mode.hpp"
 
 #include "ap_client.hpp"
+#include "ap_overlay.hpp"
 #include "ap_tracker.hpp"
 #include "emoji.hpp"
 #include "data_version.hpp"
@@ -24,7 +25,9 @@
 #include "d/d_com_inf_game.h"
 #include "d/d_file_select.h"
 #include "d/d_kankyo.h"
+#include "d/d_meter2_draw.h"
 #include "d/d_msg_flow.h"
+#include "d/d_s_play.h"
 #include "d/d_stage.h"
 #include "m_Do/m_Do_audio.h"
 
@@ -193,6 +196,17 @@ uint64_t g_hintsVersion = 1;
 uint64_t g_selectedHint = 0;        // hint_key() of the hint shown in the details pane
 std::string g_hintItemDraft;
 std::string g_hintLocationDraft;
+
+// Overlay (see "Overlay" below): settings are config vars, so they persist and bind to the tab
+struct Recent {
+    std::string text;
+    std::chrono::steady_clock::time_point at;
+};
+std::deque<Recent> g_recentItems;
+std::deque<Recent> g_recentChat;
+ConfigVarHandle g_ovEnabled = 0, g_ovCorner = 0, g_ovX = 0, g_ovY = 0, g_ovScale = 0,
+                g_ovOpacity = 0, g_ovStatus = 0, g_ovChecks = 0, g_ovItems = 0, g_ovHints = 0,
+                g_ovChat = 0, g_ovDeathLink = 0, g_ovItemCount = 0, g_ovKeep = 0;
 
 // Config
 ConfigVarHandle g_cfgServer = 0;
@@ -737,6 +751,10 @@ void on_print(const std::string& text, const json& msg) {
         toast("Archipelago", text, nullptr, 4000);
     } else if (type == "Chat" || type == "ServerChat") {
         toast("Archipelago", text, nullptr, 5000);
+        g_recentChat.push_back({text, std::chrono::steady_clock::now()});
+        while (g_recentChat.size() > 8) {
+            g_recentChat.pop_front();
+        }
     }
 }
 
@@ -841,6 +859,7 @@ DEFINE_HOOK_SYMBOL("src/d/actor/d_a_b_gnd.cpp#daB_GND_Execute", int(b_gnd_class*
 DEFINE_HOOK_SYMBOL("src/d/actor/d_a_midna.cpp#daMidna_searchNpc", void*(fopAc_ac_c*, void*),
     ApMidnaSearchNpc);
 DEFINE_HOOK(&dMsgFlow_c::query042, ApMsgQuery042);
+DEFINE_HOOK(&dMeter2Draw_c::draw, ApMeter2Draw);
 
 float model_scale() {
     double s = 0.6;
@@ -1115,6 +1134,15 @@ void deliver_items() {
         return;
     }
     g_outstanding = give;
+    {
+        const std::string sender = g_client.playerName(it.player);
+        g_recentItems.push_back({fmt::format("+ {}{}", item_name(give),
+                                     fromOther && !sender.empty() ? " (" + sender + ")" : ""),
+            std::chrono::steady_clock::now()});
+        while (g_recentItems.size() > 8) {
+            g_recentItems.pop_front();
+        }
+    }
     if (flags & ITEM_GIVE_SILENT) {
         const std::string from = g_client.playerName(it.player);
         toast("Received item", fmt::format("{}{}", item_name(give),
@@ -2074,6 +2102,199 @@ ModResult update_hints_tab(ModContext* ctx, void*, ModError*) {
 }
 
 // ---------------------------------------------------------------------------------------
+// Overlay
+//
+// A small panel drawn in the game's own HUD pass (ap_overlay.cpp), after the HUD itself, so it
+// shows during play and hides whenever the HUD does. Each part can be switched off from the
+// Overlay tab; it all starts switched off.
+
+bool cfg_on(ConfigVarHandle h) {
+    bool v = false;
+    if (h != 0) {
+        svc_mng.config->get_bool(svc_mng.mod_ctx, h, &v);
+    }
+    return v;
+}
+
+int64_t cfg_int(ConfigVarHandle h, int64_t fallback) {
+    int64_t v = fallback;
+    if (h != 0) {
+        svc_mng.config->get_int(svc_mng.mod_ctx, h, &v);
+    }
+    return v;
+}
+
+std::vector<overlay::Line> overlay_lines() {
+    using overlay::ascii_only;
+    constexpr uint32_t kWhite = 0xFFFFFFFF, kGreen = 0x6FD08CFF, kYellow = 0xE8C867FF,
+                       kRed = 0xFA8072FF, kGray = 0xC8C8C8FF, kBlue = 0x9DB8FFFF;
+    constexpr size_t kChars = 44;
+    std::vector<overlay::Line> out;
+    const auto now = std::chrono::steady_clock::now();
+    const int64_t keep = cfg_int(g_ovKeep, 30);
+    auto fresh = [&](const Recent& r) {
+        return keep <= 0 || now - r.at < std::chrono::seconds(keep);
+    };
+
+    if (cfg_on(g_ovStatus)) {
+        switch (g_client.state()) {
+        case State::Connected: out.push_back({"Archipelago: connected", kGreen}); break;
+        case State::Connecting:
+        case State::Handshaking: out.push_back({"Archipelago: connecting...", kYellow}); break;
+        default: out.push_back({"Archipelago: offline", kRed}); break;
+        }
+    }
+    if (cfg_on(g_ovChecks) && g_haveSlot) {
+        const auto n = region_counts(-1);
+        std::string text = fmt::format("Checks {}/{}", n.done, n.total);
+        if (g_logic && g_reachInputs != SIZE_MAX) {
+            text += fmt::format("   {} in logic", n.inLogic);
+        }
+        out.push_back({text, kWhite});
+        out.push_back({"", kGreen, n.total == 0 ? 0.0f : static_cast<float>(n.done) / n.total});
+    }
+    if (cfg_on(g_ovItems)) {
+        int64_t left = std::clamp<int64_t>(cfg_int(g_ovItemCount, 3), 1, 8);
+        for (auto it = g_recentItems.rbegin(); it != g_recentItems.rend() && left > 0; ++it) {
+            if (fresh(*it)) {
+                out.push_back({ascii_only(it->text, kChars), kBlue});
+                --left;
+            }
+        }
+    }
+    if (cfg_on(g_ovHints) && g_client.state() == State::Connected) {
+        const int me = g_client.slot();
+        const Hint* top = nullptr;
+        size_t open = 0;
+        for (const auto& h : g_hints) {
+            if (h.receivingPlayer == me && !h.found) {
+                ++open;
+                top = top == nullptr ? &h : top;  // g_hints is sorted, priority first
+            }
+        }
+        if (open > 0) {
+            out.push_back({fmt::format("Hints: {} open", open), kYellow});
+            out.push_back({ascii_only(fmt::format("{}{} - {}", top->status == 30 ? "! " : "",
+                                          g_client.itemName(top->item, top->receivingPlayer),
+                                          g_client.locationName(top->location, top->findingPlayer)),
+                               kChars),
+                kGray});
+        }
+    }
+    if (cfg_on(g_ovChat)) {
+        std::vector<const Recent*> lines;
+        for (auto it = g_recentChat.rbegin(); it != g_recentChat.rend() && lines.size() < 3; ++it) {
+            if (fresh(*it)) {
+                lines.push_back(&*it);
+            }
+        }
+        for (auto it = lines.rbegin(); it != lines.rend(); ++it) {  // oldest of them first
+            out.push_back({ascii_only((*it)->text, kChars), kGray});
+        }
+    }
+    if (cfg_on(g_ovDeathLink) && death_link_on()) {
+        out.push_back({"Death link on", kRed});
+    }
+    return out;
+}
+
+void post_meter2_draw(ModContext*, void*, void*, void*) {
+    if (!cfg_on(g_ovEnabled) || !in_gameplay() || dComIfGp_isPauseFlag() || dScnPly_c::isPause()) {
+        return;
+    }
+    overlay::Layout layout;
+    layout.corner = static_cast<overlay::Corner>(std::clamp<int64_t>(cfg_int(g_ovCorner, 3), 0, 5));
+    layout.offsetX = static_cast<float>(cfg_int(g_ovX, 12));
+    layout.offsetY = static_cast<float>(cfg_int(g_ovY, 0));
+    layout.scale = static_cast<float>(cfg_int(g_ovScale, 100)) / 100.0f;
+    layout.backgroundAlpha =
+        static_cast<uint8_t>(std::clamp<int64_t>(cfg_int(g_ovOpacity, 60), 0, 100) * 255 / 100);
+    overlay::draw_panel(overlay_lines(), layout);
+}
+
+void register_overlay_vars() {
+    auto reg_bool = [](const char* name, bool def, ConfigVarHandle& out) {
+        ConfigVarDesc d = CONFIG_VAR_DESC_INIT;
+        d.name = name;
+        d.type = CONFIG_VAR_BOOL;
+        d.default_bool = def;
+        svc_mng.config->register_var(svc_mng.mod_ctx, &d, &out);
+    };
+    auto reg_int = [](const char* name, int64_t def, ConfigVarHandle& out) {
+        ConfigVarDesc d = CONFIG_VAR_DESC_INIT;
+        d.name = name;
+        d.type = CONFIG_VAR_INT;
+        d.default_int = def;
+        svc_mng.config->register_var(svc_mng.mod_ctx, &d, &out);
+    };
+    reg_bool("overlay", false, g_ovEnabled);
+    reg_int("overlayCorner", 3, g_ovCorner);
+    reg_int("overlayX", 12, g_ovX);
+    reg_int("overlayY", 0, g_ovY);
+    reg_int("overlayScale", 100, g_ovScale);
+    reg_int("overlayBackground", 60, g_ovOpacity);
+    reg_bool("overlayStatus", true, g_ovStatus);
+    reg_bool("overlayChecks", true, g_ovChecks);
+    reg_bool("overlayItems", true, g_ovItems);
+    reg_bool("overlayHints", true, g_ovHints);
+    reg_bool("overlayChat", true, g_ovChat);
+    reg_bool("overlayDeathLink", true, g_ovDeathLink);
+    reg_int("overlayItemCount", 3, g_ovItemCount);
+    reg_int("overlayKeepSeconds", 30, g_ovKeep);
+}
+
+// Overlay tab: every control is bound straight to its config var.
+void add_bound(ModContext* ctx, UiElementHandle pane, UiControlKind kind, const char* label,
+    ConfigVarHandle var, const char* help = nullptr, int64_t min = 0, int64_t max = 0,
+    int64_t step = 1, const char* suffix = nullptr) {
+    UiControlDesc d = UI_CONTROL_DESC_INIT;
+    d.kind = kind;
+    d.label = label;
+    d.help_rml = help;
+    d.binding = UI_BINDING_CONFIG_VAR;
+    d.config_var = var;
+    d.min = min;
+    d.max = max;
+    d.step = step;
+    d.suffix = suffix;
+    if (kind == UI_CONTROL_SELECT) {
+        static const char* const corners[] = {"Top left", "Top right", "Middle left",
+            "Middle right", "Bottom left", "Bottom right"};
+        d.options = corners;
+        d.option_count = std::size(corners);
+    }
+    svc_mng.ui->pane_add_control(ctx, pane, &d, nullptr);
+}
+
+ModResult build_overlay_tab(ModContext* ctx, UiWindowHandle, UiElementHandle left,
+    UiElementHandle, void*, ModError*) {
+    add_bound(ctx, left, UI_CONTROL_TOGGLE, "Show overlay", g_ovEnabled,
+        "A small panel of Archipelago info on screen while you play. It hides whenever the "
+        "game's own HUD does.");
+    add_bound(ctx, left, UI_CONTROL_SELECT, "Position", g_ovCorner);
+    add_bound(ctx, left, UI_CONTROL_NUMBER, "Distance from the side", g_ovX, nullptr, 0, 600, 5);
+    add_bound(ctx, left, UI_CONTROL_NUMBER, "Distance from top or bottom", g_ovY,
+        "For the middle positions this moves the panel down (or up, below zero).", -400, 400, 5);
+    add_bound(ctx, left, UI_CONTROL_NUMBER, "Size", g_ovScale, nullptr, 50, 200, 10, "%");
+    add_bound(ctx, left, UI_CONTROL_NUMBER, "Background", g_ovOpacity, nullptr, 0, 100, 10, "%");
+    svc_mng.ui->pane_add_section(ctx, left, "Show");
+    add_bound(ctx, left, UI_CONTROL_TOGGLE, "Connection status", g_ovStatus);
+    add_bound(ctx, left, UI_CONTROL_TOGGLE, "Checks and logic", g_ovChecks,
+        "Checks done, how many are in logic now, and a progress bar.");
+    add_bound(ctx, left, UI_CONTROL_TOGGLE, "Recent items", g_ovItems,
+        "Items you just received, and who sent them.");
+    add_bound(ctx, left, UI_CONTROL_NUMBER, "Recent items shown", g_ovItemCount, nullptr, 1, 8);
+    add_bound(ctx, left, UI_CONTROL_TOGGLE, "Hints", g_ovHints,
+        "How many hints for your items are still open, and the one to look at first.");
+    add_bound(ctx, left, UI_CONTROL_TOGGLE, "Chat", g_ovChat, "The last few chat messages.");
+    add_bound(ctx, left, UI_CONTROL_TOGGLE, "Death link", g_ovDeathLink,
+        "A reminder while death link is on.");
+    add_bound(ctx, left, UI_CONTROL_NUMBER, "Keep items and chat for", g_ovKeep,
+        "0 keeps them until newer ones push them out.", 0, 300, 5, " s");
+    return MOD_OK;
+}
+
+// ---------------------------------------------------------------------------------------
 // Status window (menu bar tab)
 
 std::string g_editServer;
@@ -2176,8 +2397,8 @@ ModResult update_status_tab(ModContext* ctx, void*, ModError*) {
 }
 
 void open_status_window(ModContext*, void*) {
-    static UiTabDesc tabs[4] = {UI_TAB_DESC_INIT, UI_TAB_DESC_INIT, UI_TAB_DESC_INIT,
-        UI_TAB_DESC_INIT};
+    static UiTabDesc tabs[5] = {UI_TAB_DESC_INIT, UI_TAB_DESC_INIT, UI_TAB_DESC_INIT,
+        UI_TAB_DESC_INIT, UI_TAB_DESC_INIT};
     tabs[0].title = "Status";
     tabs[0].build = build_status_tab;
     tabs[0].update = update_status_tab;
@@ -2190,6 +2411,8 @@ void open_status_window(ModContext*, void*) {
     tabs[3].title = "Messages";
     tabs[3].build = build_messages_tab;
     tabs[3].update = update_messages_tab;
+    tabs[4].title = "Overlay";
+    tabs[4].build = build_overlay_tab;
     // The picker's buttons show their emoji as a background image.
     static const std::string rcss = [] {
         std::string out = kWindowRcss;
@@ -2202,7 +2425,7 @@ void open_status_window(ModContext*, void*) {
     }();
     UiWindowDesc desc = UI_WINDOW_DESC_INIT;
     desc.tabs = tabs;
-    desc.tab_count = 4;
+    desc.tab_count = 5;
     desc.rcss = rcss.c_str();
     desc.on_closed = [](ModContext*, UiWindowHandle, void*) {
         g_statusWindow = 0;
@@ -2264,6 +2487,7 @@ ModResult activate() {
         debug.type = CONFIG_VAR_BOOL;
         debug.default_bool = false;
         svc_mng.config->register_var(svc_mng.mod_ctx, &debug, &g_cfgDebugLog);
+        register_overlay_vars();
     }
 
     svc_mng.item->observe_gives(svc_mng.mod_ctx, observe_give, nullptr, &g_observer);
@@ -2288,6 +2512,9 @@ ModResult activate() {
     {
         mods::log::error("archipelago: transform anywhere hooks failed to install; turn on "
                          "Dusklight's Can Transform Anywhere cheat instead");
+    }
+    if (mods::hook::add_post<ApMeter2Draw>(post_meter2_draw) != MOD_OK) {
+        mods::log::error("archipelago: overlay hook failed to install; the overlay won't show");
     }
 
     UiMenuTabDesc tab = UI_MENU_TAB_DESC_INIT;
@@ -2321,6 +2548,7 @@ void deactivate() {
     mods::hook::uninstall<ApLinkFogDeadInit>();
     mods::hook::uninstall<ApMidnaSearchNpc>();
     mods::hook::uninstall<ApMsgQuery042>();
+    mods::hook::uninstall<ApMeter2Draw>();
     g_pendingDeath.reset();
     g_killFrames = 0;
     g_deathSent = false;

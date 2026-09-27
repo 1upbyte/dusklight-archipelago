@@ -146,6 +146,7 @@ set(RANDOMIZER_SOURCES
         src/ap/ap_mode.cpp
         src/ap/ap_tracker.cpp
         src/ap/emoji.cpp
+        src/ap/ap_overlay.cpp
 )
 
 # Embed the generator's YAML data into the mod library. Paths are relative to this

@@ -101,6 +101,14 @@ The **Archipelago** tab in the menu bar (F1) has more pages for use mid-run:
 The tracker needs the save to have connected to its room, which it does by itself when you load
 it.
 
+### Overlay
+
+The **Overlay** page of the Archipelago tab turns on a small panel that stays on screen while you
+play, drawn in the game's own HUD so it hides whenever the HUD does. Pick what it shows
+(connection status, checks and what's in logic, items you just received, open hints, recent
+chat, death link) and where: any corner or either side, with its distance from the edge, size
+and background. It starts switched off.
+
 ## Presets
 
 `presets/` holds seven ready-made YAMLs, each verified to generate and to rebuild exactly in
