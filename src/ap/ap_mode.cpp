@@ -2308,7 +2308,10 @@ std::vector<overlay::Line> overlay_lines() {
 }
 
 void post_meter2_draw(ModContext*, void*, void*, void*) {
-    if (!cfg_on(g_ovEnabled) || !in_gameplay() || dComIfGp_isPauseFlag() || dScnPly_c::isPause()) {
+    // Not dScnPly_c::isPause(): that's the hit-stop timer (set for a few frames when an attack
+    // lands), and hiding the panel for it made it flicker. The panel only draws boxes and text,
+    // so a frozen frame is fine; only the pause flag (menus) hides it.
+    if (!cfg_on(g_ovEnabled) || !in_gameplay() || dComIfGp_isPauseFlag()) {
         return;
     }
     overlay::Layout layout;
