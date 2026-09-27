@@ -298,7 +298,7 @@
   Tracker Important: True
   Default Option: "Off"
   Options:
-    - "Off": "You will be required to complete the Castle Sewers and Faron Twilight section of the game."
+    - "Off": "You will be required to complete the Castle Sewers and Faron Twilight section of the game. The section where you run around Ordon Village at night before Faron Twilight is removed. You can go straight to Faron Twilight after completing the sewers."
     - "On": "The Castle Sewers and Faron Twilight section of the game will be completed from the start."
 
 - Name: Eldin Twilight Cleared
