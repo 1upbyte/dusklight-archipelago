@@ -210,7 +210,8 @@ std::deque<Recent> g_recentItems;
 std::deque<Recent> g_recentChat;
 ConfigVarHandle g_ovEnabled = 0, g_ovCorner = 0, g_ovX = 0, g_ovY = 0, g_ovScale = 0,
                 g_ovOpacity = 0, g_ovStatus = 0, g_ovChecks = 0, g_ovItems = 0, g_ovHints = 0,
-                g_ovChat = 0, g_ovDeathLink = 0, g_ovItemCount = 0, g_ovKeep = 0;
+                g_ovChat = 0, g_ovDeathLink = 0, g_ovItemCount = 0, g_ovKeep = 0,
+                g_ovHintCount = 0;
 
 // Config
 ConfigVarHandle g_cfgServer = 0;
@@ -2262,28 +2263,30 @@ std::vector<overlay::Line> overlay_lines() {
     }
     if (cfg_on(g_ovHints) && g_client.state() == State::Connected) {
         const int me = g_client.slot();
-        const Hint* top = nullptr;
-        size_t open = 0;
         // Anything that concerns us: our items wherever they are, and anyone's items in our world.
-        for (const auto& h : g_hints) {
+        std::vector<const Hint*> open;
+        for (const auto& h : g_hints) {  // sorted, priority first
             if ((h.receivingPlayer == me || h.findingPlayer == me) && !h.found) {
-                ++open;
-                top = top == nullptr ? &h : top;  // g_hints is sorted, priority first
+                open.push_back(&h);
             }
         }
-        if (open > 0) {
+        if (!open.empty()) {
             section();
-            out.push_back(Line::text("Hints", kOvText, fmt::format("{} open", open), kOvYellow));
-            // Right column: whose world it's in for our items, whose item it is for theirs.
-            const std::string who = top->receivingPlayer == me
-                ? (top->findingPlayer == me ? "your world" : ascii_only(player_label(top->findingPlayer), 16))
-                : "for " + ascii_only(player_label(top->receivingPlayer), 12);
-            out.push_back(Line::text(
-                ascii_only(g_client.itemName(top->item, top->receivingPlayer), kChars),
-                top->status == 30 ? kOvYellow : kOvText, who, kOvDim, true));
-            out.push_back(Line::text(
-                ascii_only(g_client.locationName(top->location, top->findingPlayer), kChars + 6),
-                kOvDim, {}, kOvDim, true));
+            out.push_back(Line::text("Hints", kOvText, fmt::format("{} open", open.size()), kOvYellow));
+            const auto shown = static_cast<size_t>(std::clamp<int64_t>(cfg_int(g_ovHintCount, 3), 1, 8));
+            for (size_t k = 0; k < open.size() && k < shown; ++k) {
+                const Hint* h = open[k];
+                // Right column: whose world our item is in, or whose item it is.
+                const std::string who = h->receivingPlayer == me
+                    ? (h->findingPlayer == me ? "your world"
+                                              : ascii_only(player_label(h->findingPlayer), 16))
+                    : "for " + ascii_only(player_label(h->receivingPlayer), 12);
+                out.push_back(Line::text(ascii_only(g_client.itemName(h->item, h->receivingPlayer), kChars),
+                    h->status == 30 ? kOvYellow : kOvText, who, kOvDim, true));
+                out.push_back(Line::text(
+                    ascii_only(g_client.locationName(h->location, h->findingPlayer), kChars + 6),
+                    kOvDim, {}, kOvDim, true));
+            }
         }
     }
     if (cfg_on(g_ovChat)) {
@@ -2353,6 +2356,7 @@ void register_overlay_vars() {
     reg_bool("overlayChat", true, g_ovChat);
     reg_bool("overlayDeathLink", true, g_ovDeathLink);
     reg_int("overlayItemCount", 3, g_ovItemCount);
+    reg_int("overlayHintCount", 3, g_ovHintCount);
     reg_int("overlayKeepSeconds", 30, g_ovKeep);
 }
 
@@ -2402,7 +2406,9 @@ ModResult build_overlay_tab(ModContext* ctx, UiWindowHandle, UiElementHandle lef
         "Items you just received, and who sent them.");
     add_bound(ctx, left, UI_CONTROL_NUMBER, "Recent items shown", g_ovItemCount, nullptr, 1, 8);
     add_bound(ctx, left, UI_CONTROL_TOGGLE, "Hints", g_ovHints,
-        "How many hints for your items are still open, and the one to look at first.");
+        "Open hints that concern you: your items wherever they are, and anyone's items in your "
+        "world. Priority hints come first.");
+    add_bound(ctx, left, UI_CONTROL_NUMBER, "Hints shown", g_ovHintCount, nullptr, 1, 8);
     add_bound(ctx, left, UI_CONTROL_TOGGLE, "Chat", g_ovChat, "The last few chat messages.");
     add_bound(ctx, left, UI_CONTROL_TOGGLE, "Death link", g_ovDeathLink,
         "A reminder while death link is on.");
