@@ -322,7 +322,7 @@
 - Name: Snowpeak Ruins Double Freezard Room Behind Freezard
   Region: Snowpeak Ruins
   Exits:
-    Snowpeak Ruins West Courtyard North Balcony: Can_Open_Doors
+    Snowpeak Ruins West Courtyard South Balcony: Can_Open_Doors
     Snowpeak Ruins Double Freezard Room: Can_Defeat_Freezard
 
 # SNOWPEAK RUINS CHAPEL
