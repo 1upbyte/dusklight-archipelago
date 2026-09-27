@@ -429,6 +429,22 @@ F_SP103:
       layers:
         - 0
 
+    # Delete Bo on layer 0 so we can't attempt the glitchy goat stop
+    - action: delete
+      name: Bou
+      parameters: 0x0000FF04
+      position:
+        x: -526.825012207031
+        y: 300
+        z: 5333.2861328125
+      angle:
+        x: 0x0033
+        y: 0xC38F
+        z: 0x0000
+      set id: 0xFFFF
+      layers:
+        - 0
+
     # Rupee on Rusl's House (they both share the same flag, this gives one a different flag)
     - action: patch
       name: item
@@ -448,6 +464,7 @@ F_SP103:
       layers:
         - 0
         - 5
+        - 6
 
     # Rupee above Haunch's House (also flag sharing situation)
     - action: patch
@@ -467,6 +484,7 @@ F_SP103:
         parameters: 0xF3FF8501
       layers:
         - 0
+        - 6
 
     # Rupee by Bo's Window (also flag sharing situation)
     - action: patch
