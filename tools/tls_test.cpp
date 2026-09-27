@@ -1,5 +1,6 @@
 // Host-side test for the mod's network client: the TLS layer (src/ap/tls.cpp), the text
-// sanitizer (src/ap/text_safe.hpp) and WebSocket decompression (src/ap/ws_deflate.cpp).
+// sanitizer (src/ap/text_safe.hpp), WebSocket decompression (src/ap/ws_deflate.cpp) and cover
+// matching (src/ap/cover_art.cpp).
 //
 // TlsStream never touches a socket itself, so it can be driven over ordinary blocking
 // sockets here, against real servers, without launching the game. Run with no arguments
@@ -10,7 +11,13 @@
 //     tls_test archipelago.gg:443=ok expired.badssl.com:443=fail
 //
 // Exits non-zero if any case did not behave as expected.
+//
+//     tls_test --covers <search.json> [images...]
+//
+// runs cover matching over saved SteamGridDB searches ({"game": response, ...}) and decodes
+// images the way the mod does, printing what it picked (rig/cover_probe.py makes the file).
 
+#include "ap/cover_art.hpp"
 #include "ap/emoji.hpp"
 #include "ap/text_safe.hpp"
 #include "ap/tls.hpp"
@@ -18,6 +25,7 @@
 
 #include <cstdio>
 #include <cstring>
+#include <fstream>
 #include <string>
 #include <vector>
 
@@ -247,6 +255,94 @@ bool check_emoji() {
     return ok;
 }
 
+bool check_covers() {
+    using ap::cover_art::file_stem;
+    using ap::cover_art::pick_game;
+    using ap::cover_art::pick_grid;
+    using ap::cover_art::url_encode;
+    using nlohmann::json;
+    const json oot = json::parse(R"({"success":true,"data":[
+        {"id":5355393,"name":"Ocarina of Time Spaceworld '97 Beta Experience","verified":true,"types":[]},
+        {"id":5465593,"name":"Ocarina of Time + Majora's Mask Combo Randomizer","verified":true,"types":[]},
+        {"id":21202,"name":"The Legend of Zelda: Ocarina of Time","verified":true,"types":["eshop"]},
+        {"id":36271,"name":"The Legend of Zelda: Ocarina of Time 3D","verified":true,"types":[]}]})");
+    const json hk = json::parse(R"({"success":true,"data":[
+        {"id":7545,"name":"Hollow Knight","verified":true,"types":["steam","gog"]},
+        {"id":1043,"name":"Hollow Knight: Silksong","verified":true,"types":["steam"]}]})");
+    const json unrelated = json::parse(R"({"success":true,"data":[
+        {"id":1,"name":"Checkers Deluxe","verified":true,"types":["steam"]}]})");
+    const json re2 = json::parse(R"({"success":true,"data":[
+        {"id":25577,"name":"Resident Evil 2","verified":true,"types":["steam"],"release_date":900000000},
+        {"id":29143,"name":"Resident Evil 2","verified":true,"types":["steam"],"release_date":1548374400},
+        {"id":32193,"name":"Resident Evil 2: 1-Shot Demo","verified":true,"types":["steam"],"release_date":1547000000}]})");
+    const json grids = json::parse(R"({"success":true,"data":[
+        {"width":920,"height":430,"thumb":"https://cdn/wide.jpg"},
+        {"width":600,"height":900,"thumb":"https://cdn/tall.jpg"}]})");
+    auto id = [](std::optional<int64_t> v) { return v ? std::to_string(*v) : std::string{"none"}; };
+    struct Check {
+        const char* what;
+        std::string got;
+        std::string expected;
+    };
+    const std::vector<Check> checks = {
+        {"covers: franchise prefix", id(pick_game("Ocarina of Time", oot)), "21202"},
+        {"covers: exact beats sequel", id(pick_game("Hollow Knight", hk)), "7545"},
+        {"covers: no weak match", id(pick_game("ChecksFinder", unrelated)), "none"},
+        {"covers: failed search", id(pick_game("Hollow Knight", json::parse(R"({"success":false})"))), "none"},
+        {"covers: remake -> newest", id(pick_game("Resident Evil 2 Remake", re2)), "29143"},
+        {"covers: fallback term", ap::cover_art::fallback_term("Resident Evil 2 Remake"), "Resident Evil 2"},
+        {"covers: portrait grid first", pick_grid(grids), "https://cdn/tall.jpg"},
+        {"covers: url encoding", url_encode("Pok\xC3\xA9mon: Red & Blue"), "Pok%C3%A9mon%3A%20Red%20%26%20Blue"},
+        {"covers: file stem", file_stem("A Link to the Past").substr(0, 19), "a-link-to-the-past-"},
+    };
+    bool ok = true;
+    for (const Check& check : checks) {
+        std::printf("%-32s ", check.what);
+        if (check.got == check.expected) {
+            std::printf("PASS\n");
+        } else {
+            std::printf("FAIL  got '%s'\n", check.got.c_str());
+            ok = false;
+        }
+    }
+    return ok;
+}
+
+int covers_live(int argc, char** argv) {
+    using nlohmann::json;
+    std::ifstream in(argv[2]);
+    const json all = json::parse(in);
+    for (const auto& [game, response] : all.items()) {
+        const auto picked = ap::cover_art::has_box(game) ? ap::cover_art::pick_game(game, response)
+                                                          : std::nullopt;
+        std::string name = ap::cover_art::has_box(game) ? "(none: stays a Sol)" : "(no box: Archipelago-only)";
+        for (const auto& g : response.value("data", json::array())) {
+            if (picked && g.value("id", int64_t{0}) == *picked) {
+                name = g.value("name", std::string{});
+            }
+        }
+        std::printf("%-40s -> %s\n", game.c_str(), name.c_str());
+    }
+    for (int i = 3; i < argc; ++i) {
+        std::ifstream file(argv[i], std::ios::binary);
+        const std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+        const auto image = ap::cover_art::process(bytes.data(), bytes.size());
+        if (!image) {
+            std::printf("%s: did not decode\n", argv[i]);
+            continue;
+        }
+        std::printf("%s: %ux%u, %u mips, %zu bytes, aspect %.2f, spine %u,%u,%u, icon %u square, %u mips, %zu bytes\n",
+            argv[i], image->width, image->height, image->mips, image->texels.size(), image->aspect,
+            image->spine[0], image->spine[1], image->spine[2], image->iconSize, image->iconMips,
+            image->icon.size());
+        // Raw RGBA of the icon's top level, to look at (rig/cover_probe.py turns it into a PNG).
+        std::ofstream(std::string(argv[i]) + ".icon.rgba", std::ios::binary)
+            .write(reinterpret_cast<const char*>(image->icon.data()),
+                static_cast<std::streamsize>(image->iconSize) * image->iconSize * 4);
+    }
+    return 0;
+}
+
 #include "deflate_vectors.inc"
 
 // permessage-deflate, against vectors from the same websockets encoder Archipelago's server
@@ -337,6 +433,10 @@ int main(int argc, char** argv) {
     WSAStartup(MAKEWORD(2, 2), &wsa);
 #endif
 
+    if (argc >= 3 && std::strcmp(argv[1], "--covers") == 0) {
+        return covers_live(argc, argv);
+    }
+
     std::vector<Case> cases;
     for (int i = 1; i < argc; ++i) {
         cases.push_back(parse(argv[i]));
@@ -355,6 +455,8 @@ int main(int argc, char** argv) {
     int failures = check_text_safety() ? 0 : 1;
     std::printf("\n");
     failures += check_emoji() ? 0 : 1;
+    std::printf("\n");
+    failures += check_covers() ? 0 : 1;
     std::printf("\n");
     failures += check_deflate() ? 0 : 1;
     std::printf("\n");

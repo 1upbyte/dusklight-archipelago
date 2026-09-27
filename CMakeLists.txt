@@ -147,6 +147,9 @@ set(RANDOMIZER_SOURCES
         src/ap/ap_tracker.cpp
         src/ap/emoji.cpp
         src/ap/ap_overlay.cpp
+        src/ap/ap_covers.cpp
+        src/ap/ap_box.cpp
+        src/ap/cover_art.cpp
 )
 
 # Embed the generator's YAML data into the mod library. Paths are relative to this
@@ -170,7 +173,7 @@ b_embed(randomizer_embeds "src/ap/ca_bundle.pem")
 
 # Versioning
 set(RANDOMIZER_VERSION "1.0.5")
-set(ARCHIPELAGO_VERSION "1.3.0")
+set(ARCHIPELAGO_VERSION "1.4.0")
 find_package(Git QUIET)
 if(GIT_FOUND)
     execute_process(
@@ -277,8 +280,9 @@ target_compile_definitions(ap_gen_test PRIVATE
 # Offline test: drive the TLS client over ordinary sockets, against real servers.
 add_executable(tls_test ${CMAKE_CURRENT_SOURCE_DIR}/tools/tls_test.cpp ${CMAKE_CURRENT_SOURCE_DIR}/src/ap/tls.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/ap/emoji.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/ap/cover_art.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/ap/ws_deflate.cpp)
-target_link_libraries(tls_test PRIVATE randomizer_embeds MbedTLS::mbedtls ap_miniz)
+target_link_libraries(tls_test PRIVATE randomizer_embeds MbedTLS::mbedtls ap_miniz nlohmann_json::nlohmann_json)
 target_include_directories(tls_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/tools)
 if (WIN32)
     target_link_libraries(tls_test PRIVATE ws2_32)

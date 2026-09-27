@@ -1,6 +1,8 @@
 #include "ap_mode.hpp"
 
+#include "ap_box.hpp"
 #include "ap_client.hpp"
+#include "ap_covers.hpp"
 #include "ap_overlay.hpp"
 #include "ap_tracker.hpp"
 #include "emoji.hpp"
@@ -21,12 +23,15 @@
 #include "d/actor/d_a_alink.h"
 #include "d/actor/d_a_b_gnd.h"
 #include "d/actor/d_a_demo_item.h"
+#include "d/actor/d_a_itembase.h"
 #include "d/actor/d_a_obj_item.h"
 #include "d/d_com_inf_game.h"
 #include "d/d_file_select.h"
 #include "d/d_kankyo.h"
 #include "d/d_meter2_draw.h"
 #include "d/d_msg_flow.h"
+#include "d/d_msg_scrn_item.h"
+#include "JSystem/J2DGraph/J2DPicture.h"
 #include "d/d_s_play.h"
 #include "d/d_stage.h"
 #include "m_Do/m_Do_audio.h"
@@ -114,6 +119,14 @@ bool g_haveSlot = false;
 std::string g_slotSeed;
 std::unordered_map<std::string, int64_t> g_locationIds;       // location name -> AP id
 std::unordered_map<std::string, std::string> g_apItemText;    // location name -> get text
+// Other worlds' items in this world: location -> the slot that owns it (for its game's box).
+std::unordered_map<std::string, std::string> g_placementOwner;
+// Item actors that resolved to an AP item -> their location (from the check resolver).
+std::unordered_map<const void*, std::string> g_actorLocation;
+// The item Link is holding up: its demo actor carries the pickup's committed result, which
+// never passes the resolver, so it's matched to the pickup's location here instead.
+const void* g_heldActor = nullptr;
+std::string g_heldLocation;
 std::unordered_map<std::string, std::string> g_expected;      // location name -> item AP expects
 std::unordered_map<std::string, std::vector<std::string>> g_checkToLocations;
 
@@ -145,6 +158,11 @@ std::string g_genError;
 
 // AP item text
 std::string g_armedText;
+// The get-item text box showing our text: it borrows the Foolish Item's message, so the box
+// thinks it's a Foolish Item (see post_msg_item_exec). Set when our text is served; the box
+// that sees it first claims it.
+bool g_apTextServed = false;
+const void* g_apTextBox = nullptr;
 int g_armedFrames = 0;
 std::string g_lastResolvedApLocation;
 std::vector<mods::flow::MessageOverride> g_textOverrides;
@@ -155,6 +173,7 @@ ItemGiveHandle g_observer = 0;
 UiMenuTabHandle g_menuTab = 0;
 UiWindowHandle g_statusWindow = 0;
 UiElementHandle g_statusWindowText = 0;
+UiElementHandle g_coverStatusText = 0;  // Overlay tab: how the covers are doing
 
 // Death link (see "Death link" below)
 bool g_deathLinkSlot = false;   // the YAML's choice, from slot_data
@@ -218,6 +237,9 @@ ConfigVarHandle g_cfgServer = 0;
 ConfigVarHandle g_cfgSlot = 0;
 ConfigVarHandle g_cfgModelScale = 0;
 ConfigVarHandle g_cfgDebugLog = 0;
+ConfigVarHandle g_cfgBoxes = 0;     // other worlds' items as game boxes
+ConfigVarHandle g_cfgSgdbKey = 0;   // the player's SteamGridDB API key
+ConfigVarHandle g_cfgBoxChoice = 0; // 0: not asked yet, 1: game boxes, 2: Sols
 
 // ---------------------------------------------------------------------------------------
 // Helpers
@@ -515,7 +537,11 @@ bool load_slot_data(const json& slotData, std::string& err) {
         g_locationIds[name] = id.get<int64_t>();
     }
     g_expected.clear();
+    g_placementOwner.clear();
     for (const auto& [loc, v] : slotData.value("placements", json::object()).items()) {
+        if (v.is_object()) {
+            g_placementOwner[loc] = v.value("player", "");
+        }
         g_expected[loc] = v.is_object() ? fmt::format("{} ({})", v.value("name", "?"),
                                               v.value("player", "?"))
                                         : v.get<std::string>();
@@ -646,6 +672,8 @@ bool seed_files_exist(const std::string& hash) {
 
 json g_lastSlotData;
 
+void want_covers();  // Game boxes, below
+
 void on_connected(const json& p) {
     const json slotData = p.value("slot_data", json::object());
     std::string err;
@@ -666,6 +694,7 @@ void on_connected(const json& p) {
         g_state.transformAnywhere = g_transformAnywhereSlot;
         write_state();
     }
+    want_covers();
     g_checked.clear();
     for (const auto& id : p.value("checked_locations", json::array())) {
         g_checked.insert(id.get<int64_t>());
@@ -784,6 +813,10 @@ bool resolve_check(ModContext*, const ItemCheckInfo* info, ItemCheckResolution*,
         const auto locs = locations_for_check(info->name);
         if (!locs.empty()) {
             g_lastResolvedApLocation = locs.front();
+            if (info->giver_actor != nullptr) {
+                g_actorLocation[info->giver_actor] = locs.front();  // for its box (see draw)
+            }
+            g_heldActor = nullptr;  // a new pickup: the next held item is this one
         }
     }
     return false;
@@ -849,6 +882,7 @@ bool ap_item_text(ModContext*, const MessageOverrideContext*, MessageTextData* o
     // Consume it: the next Archipelago item re-arms with its own text, and a real Foolish
     // Item (which shares this message) must not inherit it.
     g_armedFrames = 0;
+    g_apTextServed = true;
     return true;
 }
 
@@ -867,9 +901,18 @@ DEFINE_HOOK_SYMBOL("src/d/actor/d_a_midna.cpp#daMidna_searchNpc", void*(fopAc_ac
     ApMidnaSearchNpc);
 DEFINE_HOOK(&dMsgFlow_c::query042, ApMsgQuery042);
 DEFINE_HOOK(&dMeter2Draw_c::draw, ApMeter2Draw);
+// Virtual, so hooked by its exact symbol: every item actor (ground, held up, shop, heart
+// container, key) draws through it.
+#ifdef _MSVC_LANG
+DEFINE_HOOK_SYMBOL("?DrawBase@daItemBase_c@@UEAAHXZ", int(daItemBase_c*), ApItemDrawBase);
+DEFINE_HOOK_SYMBOL("?exec@dMsgScrnItem_c@@UEAAXXZ", void(dMsgScrnItem_c*), ApMsgItemExec);
+#else
+DEFINE_HOOK_SYMBOL("_ZN12daItemBase_c8DrawBaseEv", int(daItemBase_c*), ApItemDrawBase);
+DEFINE_HOOK_SYMBOL("_ZN14dMsgScrnItem_c4execEv", void(dMsgScrnItem_c*), ApMsgItemExec);
+#endif
 
 float model_scale() {
-    double s = 0.6;
+    double s = 0.3;
     if (g_cfgModelScale != 0) {
         svc_mng.config->get_float(svc_mng.mod_ctx, g_cfgModelScale, &s);
     }
@@ -903,6 +946,172 @@ void post_item_set_base_mtx(ModContext*, void* args, void*, void*) {
     if (item->getDisplayItemNo() == kApItem) {
         scale_model(item->mpModel);
     }
+}
+
+// ---------------------------------------------------------------------------------------
+// Game boxes: other worlds' items drawn as their game's box instead of a Sol
+
+bool cfg_on(ConfigVarHandle h);  // with the overlay settings below
+int64_t cfg_int(ConfigVarHandle h, int64_t fallback);
+bool in_gameplay();
+void get_str(ModContext*, void* ud, UiControlValue* out);
+void set_str(ModContext*, void* ud, const UiControlValue* v);
+
+// A pasted key often brings a space or newline along.
+std::string trim_key(std::string key) {
+    std::erase_if(key, [](char c) { return c == ' ' || c == '\t' || c == '\r' || c == '\n'; });
+    return key;
+}
+
+// The game that owns the AP item at a location, or "".
+std::string game_for_location(const std::string& location) {
+    const auto owner = g_placementOwner.find(location);
+    return owner != g_placementOwner.end() ? g_client.gameOfSlotName(owner->second) : std::string{};
+}
+
+// The game that owns the AP item an actor shows, or "" when we can't tell.
+std::string game_for_actor(const void* actor) {
+    std::string location;
+    if (fopAcM_GetName(const_cast<void*>(actor)) == fpcNm_Demo_Item_e) {
+        // Held up: the pickup resolved just before this actor appeared (see g_heldActor).
+        if (g_heldActor != actor) {
+            g_heldActor = actor;
+            g_heldLocation = g_lastResolvedApLocation;
+        }
+        location = g_heldLocation;
+    } else if (const auto loc = g_actorLocation.find(actor); loc != g_actorLocation.end()) {
+        location = loc->second;
+    }
+    const auto owner = g_placementOwner.find(location);
+    if (owner == g_placementOwner.end()) {
+        return {};
+    }
+    return g_client.gameOfSlotName(owner->second);
+}
+
+HookAction pre_item_draw_base(ModContext*, void* args, void* retval, void*) {
+    auto* item = mods::arg<daItemBase_c*>(args, 0);
+    if (item == nullptr || item->getDisplayItemNo() != kApItem || !cfg_on(g_cfgBoxes)) {
+        return HOOK_CONTINUE;
+    }
+    const std::string game = game_for_actor(item);
+    const covers::Cover* cover = game.empty() ? nullptr : covers::get(game);
+    const bool held = fopAcM_GetName(item) == fpcNm_Demo_Item_e;
+    if (cover == nullptr || !box::draw(item, *cover, held)) {
+        return HOOK_CONTINUE;
+    }
+    *static_cast<int*>(retval) = 1;
+    return HOOK_SKIP_ORIGINAL;
+}
+
+// First run: game boxes (with a SteamGridDB key) or Sols. Asked once, on the connection
+// window or in play, and never again once answered (or once a key is set some other way).
+std::string g_keyDraft;
+bool g_boxPromptShown = false;
+
+void choose_boxes(ModContext*, UiDialogHandle, void*) {
+    svc_mng.config->set_string(svc_mng.mod_ctx, g_cfgSgdbKey, trim_key(g_keyDraft).c_str());
+    svc_mng.config->set_bool(svc_mng.mod_ctx, g_cfgBoxes, true);
+    svc_mng.config->set_int(svc_mng.mod_ctx, g_cfgBoxChoice, 1);
+}
+
+void choose_sols(ModContext*, UiDialogHandle, void*) {
+    svc_mng.config->set_bool(svc_mng.mod_ctx, g_cfgBoxes, false);
+    svc_mng.config->set_int(svc_mng.mod_ctx, g_cfgBoxChoice, 2);
+}
+
+void prompt_boxes() {
+    static const UiDialogAction actions[] = {
+        {sizeof(UiDialogAction), "Use game boxes", choose_boxes, nullptr, false,
+            [](ModContext*, void*) { return trim_key(g_keyDraft).empty(); }},
+        {sizeof(UiDialogAction), "Keep Sols", choose_sols, nullptr, false, nullptr},
+    };
+    UiDialogDesc desc = UI_DIALOG_DESC_INIT;
+    desc.title = "Other players' items";
+    desc.icon = "question-mark";
+    desc.body_rml =
+        "Items that belong to other players can show as the box of the game they're for, with "
+        "its cover art, instead of a Sol.<br/><br/>Covers come from SteamGridDB and need your "
+        "own API key, which is free: sign in at steamgriddb.com, open Preferences, then API, "
+        "and paste the key below.<br/><br/>You can change this any time on the Status page of "
+        "the Archipelago tab (F1).";
+    desc.actions = actions;
+    desc.action_count = std::size(actions);
+    desc.build = [](ModContext* ctx, UiElementHandle pane, void*, ModError*) -> ModResult {
+        UiControlDesc input = UI_CONTROL_DESC_INIT;
+        input.kind = UI_CONTROL_STRING;
+        input.label = "SteamGridDB API key";
+        input.string_set_mode = UI_STRING_SET_ON_CHANGE;
+        input.get = get_str;
+        input.set = set_str;
+        input.user_data = &g_keyDraft;
+        return svc_mng.ui->pane_add_control(ctx, pane, &input, nullptr);
+    };
+    svc_mng.ui->dialog_push(svc_mng.mod_ctx, &desc, nullptr);
+}
+
+void maybe_prompt_boxes() {
+    if (g_boxPromptShown || g_cfgBoxChoice == 0 || cfg_int(g_cfgBoxChoice, 0) != 0) {
+        return;
+    }
+    if (!trim_key(config_string(g_cfgSgdbKey)).empty()) {
+        svc_mng.config->set_int(svc_mng.mod_ctx, g_cfgBoxChoice, 1);  // set up before this asked
+        return;
+    }
+    if (g_phase == Phase::NewSave || (g_phase == Phase::Playing && in_gameplay())) {
+        g_boxPromptShown = true;
+        prompt_boxes();
+    }
+}
+
+// The get-item text box: its icon (the Sol's rupee-shaped stand-in) becomes the cover. The
+// box builds its pictures from the icon it loads, sized for that; swapping the picture's
+// texture afterwards keeps the size and changes only the image.
+void post_msg_item_exec(ModContext*, void* args, void*, void*) {
+    auto* scrn = mods::arg<dMsgScrnItem_c*>(args, 0);
+    if (scrn == nullptr || !cfg_on(g_cfgBoxes)) {
+        return;
+    }
+    // The box works out its item from the message: ours is the Foolish Item's (0x13).
+    constexpr int kDonorItem = kApItemDonorMessage - 0x65;
+    if (scrn->mItemIndex == kDonorItem && g_apTextServed) {
+        g_apTextServed = false;
+        g_apTextBox = scrn;
+    }
+    if (scrn->mItemIndex != kApItem && scrn != g_apTextBox) {
+        return;
+    }
+    J2DPicture* pane = scrn->mpItemPane[0];
+    const covers::Cover* cover = covers::get(game_for_location(g_heldLocation));
+    if (pane == nullptr || cover == nullptr || cover->iconTimg.empty()) {
+        return;
+    }
+    const auto* timg = reinterpret_cast<const ResTIMG*>(cover->iconTimg.data());
+    if (const JUTTexture* tex = pane->getTexture(0); tex != nullptr && tex->getTexInfo() == timg) {
+        return;  // already showing it
+    }
+    pane->changeTexture(timg, 0);
+    // The box draws the icon at a size taken from the stand-in's shape (taller than wide); the
+    // cover's icon is square, so draw it square, as big as the icon slot allows. It centres
+    // itself in the slot.
+    const float side = std::min(scrn->field_0x170, scrn->field_0x174);
+    scrn->field_0x178 = side;
+    scrn->field_0x17c = side;
+    // The icon's colours were set for the stand-in (tinted); the cover shows as it is.
+    pane->setBlackWhite(JUtility::TColor(0, 0, 0, 0), JUtility::TColor(255, 255, 255, 255));
+    pane->setCornerColor(JUtility::TColor(255, 255, 255, 255));
+}
+
+// Covers for every game with an item in this world (theirs, or another Twilight Princess).
+void want_covers() {
+    std::vector<std::string> games;
+    for (const auto& [loc, owner] : g_placementOwner) {
+        const std::string game = g_client.gameOfSlotName(owner);
+        if (!game.empty() && std::find(games.begin(), games.end(), game) == games.end()) {
+            games.push_back(game);
+        }
+    }
+    covers::want(games);
 }
 
 void complete_goal(const char* how) {
@@ -2414,8 +2623,10 @@ ModResult build_overlay_tab(ModContext* ctx, UiWindowHandle, UiElementHandle lef
         "A reminder while death link is on.");
     add_bound(ctx, left, UI_CONTROL_NUMBER, "Fade items and chat after", g_ovKeep,
         "0 keeps them until newer ones push them out.", 0, 300, 5, " s");
+
     return MOD_OK;
 }
+
 
 // ---------------------------------------------------------------------------------------
 // Status window (menu bar tab)
@@ -2504,10 +2715,37 @@ ModResult build_status_tab(ModContext* ctx, UiWindowHandle, UiElementHandle left
     b2.label = "Disconnect";
     b2.on_pressed = press_disconnect;
     svc_mng.ui->pane_add_control(ctx, left, &b2, nullptr);
+
+    svc_mng.ui->pane_add_section(ctx, left, "Other players' items");
+    add_bound(ctx, left, UI_CONTROL_TOGGLE, "Show as game boxes", g_cfgBoxes,
+        "Items that belong to other worlds show as the box of the game they're for, with its "
+        "cover art, instead of a Sol. Covers come from SteamGridDB with your own API key and "
+        "download once per game. Games without art stay Sols.");
+    add_bound(ctx, left, UI_CONTROL_STRING, "SteamGridDB API key", g_cfgSgdbKey,
+        "Free: sign in at steamgriddb.com, then Preferences, API, and copy your key here. "
+        "It's only sent to SteamGridDB. Leave it empty and items stay Sols.");
+    g_coverStatusText = 0;
+    svc_mng.ui->pane_add_text(ctx, left, covers::status().c_str(), &g_coverStatusText);
+    UiControlDesc again = UI_CONTROL_DESC_INIT;
+    again.kind = UI_CONTROL_BUTTON;
+    again.label = "Download covers again";
+    again.help_rml = "Forgets the saved covers (and which games had none) and downloads them "
+                     "again. To use your own art for a game, put a PNG or JPG named after the "
+                     "game in randomizer/archipelago/covers/custom.";
+    again.on_pressed = [](ModContext*, void*) { covers::refetch(); };
+    svc_mng.ui->pane_add_control(ctx, left, &again, nullptr);
     return MOD_OK;
 }
 
 ModResult update_status_tab(ModContext* ctx, void*, ModError*) {
+    if (g_coverStatusText != 0) {
+        static std::string shownCovers;
+        const std::string now = covers::status();
+        if (now != shownCovers) {
+            shownCovers = now;
+            svc_mng.ui->elem_set_text(ctx, g_coverStatusText, now.c_str());
+        }
+    }
     if (g_statusWindowText != 0) {
         static std::string shown;
         const std::string now = status_text();
@@ -2554,6 +2792,7 @@ void open_status_window(ModContext*, void*) {
     desc.on_closed = [](ModContext*, UiWindowHandle, void*) {
         g_statusWindow = 0;
         g_statusWindowText = 0;
+        g_coverStatusText = 0;
         g_trackerSummary = g_trackerProgress = g_trackerList = 0;
         g_trackerGroups.clear();
         g_logElem = 0;
@@ -2604,7 +2843,7 @@ ModResult activate() {
         ConfigVarDesc d = CONFIG_VAR_DESC_INIT;
         d.name = "apItemModelScale";
         d.type = CONFIG_VAR_FLOAT;
-        d.default_float = 0.6;
+        d.default_float = 0.3;
         svc_mng.config->register_var(svc_mng.mod_ctx, &d, &g_cfgModelScale);
         ConfigVarDesc debug = CONFIG_VAR_DESC_INIT;
         debug.name = "debugLog";
@@ -2612,6 +2851,17 @@ ModResult activate() {
         debug.default_bool = false;
         svc_mng.config->register_var(svc_mng.mod_ctx, &debug, &g_cfgDebugLog);
         register_overlay_vars();
+        ConfigVarDesc boxes = CONFIG_VAR_DESC_INIT;
+        boxes.name = "gameBoxes";
+        boxes.type = CONFIG_VAR_BOOL;
+        boxes.default_bool = true;
+        svc_mng.config->register_var(svc_mng.mod_ctx, &boxes, &g_cfgBoxes);
+        reg_string("steamGridDbKey", g_cfgSgdbKey);
+        ConfigVarDesc choice = CONFIG_VAR_DESC_INIT;
+        choice.name = "gameBoxChoice";
+        choice.type = CONFIG_VAR_INT;
+        choice.default_int = 0;
+        svc_mng.config->register_var(svc_mng.mod_ctx, &choice, &g_cfgBoxChoice);
     }
 
     svc_mng.item->observe_gives(svc_mng.mod_ctx, observe_give, nullptr, &g_observer);
@@ -2640,6 +2890,12 @@ ModResult activate() {
     g_emojiFont = load_emoji_font();
     if (mods::hook::add_post<ApMeter2Draw>(post_meter2_draw) != MOD_OK) {
         mods::log::error("archipelago: overlay hook failed to install; the overlay won't show");
+    }
+    if (mods::hook::add_pre<ApItemDrawBase>(pre_item_draw_base) != MOD_OK) {
+        mods::log::error("archipelago: item draw hook failed to install; items stay Sols");
+    }
+    if (mods::hook::add_post<ApMsgItemExec>(post_msg_item_exec) != MOD_OK) {
+        mods::log::error("archipelago: item text box hook failed to install; its icon stays");
     }
 
     UiMenuTabDesc tab = UI_MENU_TAB_DESC_INIT;
@@ -2674,6 +2930,9 @@ void deactivate() {
     mods::hook::uninstall<ApMidnaSearchNpc>();
     mods::hook::uninstall<ApMsgQuery042>();
     mods::hook::uninstall<ApMeter2Draw>();
+    mods::hook::uninstall<ApItemDrawBase>();
+    mods::hook::uninstall<ApMsgItemExec>();
+    g_actorLocation.clear();
     g_pendingDeath.reset();
     g_killFrames = 0;
     g_deathSent = false;
@@ -2713,6 +2972,9 @@ void tick() {
         tick_death_link();
     }
     tick_tracker();
+    maybe_prompt_boxes();
+    covers::tick(trim_key(config_string(g_cfgSgdbKey)), cfg_on(g_cfgBoxes));
+    box::tick();
 }
 
 ModResult open_connect_gate(void* fileSelect) {
@@ -2727,6 +2989,8 @@ void on_get_item_demo(void* link) {
     if (alink->mProcVar2.field_0x300c != kApItem) {
         if (alink->mProcVar2.field_0x300c == dItemNo_Randomizer_FOOLISH_ITEM_e) {
             g_armedFrames = 0;  // a real Foolish Item uses the same message
+            g_apTextServed = false;
+            g_apTextBox = nullptr;
         }
         return;
     }
@@ -2741,7 +3005,10 @@ void on_get_item_demo(void* link) {
     if (g_armedText.empty()) {
         g_armedText = "You found another player's item!";
     }
+    g_heldLocation = g_lastResolvedApLocation;
     g_armedFrames = 600;
+    g_apTextServed = false;  // this pickup's text box claims it when the text is served
+    g_apTextBox = nullptr;
     alink->field_0x32cc = kApItemDonorMessage;
 }
 

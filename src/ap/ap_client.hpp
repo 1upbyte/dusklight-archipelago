@@ -88,6 +88,10 @@ public:
     // Names from the data package, by the game of the slot that owns the id.
     std::string itemName(int64_t id, int ownerSlot) const;
     std::string locationName(int64_t id, int ownerSlot) const;
+    // The game a slot plays, by its slot name (as slot_info lists it), or "" if unknown.
+    std::string gameOfSlotName(const std::string& slotName) const;
+    // Every game in the room, one entry each.
+    std::vector<std::string> games() const;
 
     static constexpr const char* kGame = "Twilight Princess (Dusklight)";
 

@@ -43,7 +43,8 @@ Then:
 3. Press **Connect and start**. The seed is built from the server's data, which takes a few
    seconds, and then you continue to name entry as usual.
 4. Play. Checks are sent as you collect them, and items other players find for you arrive
-   automatically. Items belonging to other worlds appear as a Sol and say who they belong to.
+   automatically. Items belonging to other worlds appear as a Sol (or as their game's box, see
+   below) and say who they belong to.
 
 Loading an existing Archipelago save reconnects by itself. If the room moved to a different
 port, open the **Archipelago** tab in the menu bar (F1), change the server there, and press
@@ -108,6 +109,19 @@ play, drawn in the game's own HUD so it hides whenever the HUD does. Pick what i
 (connection status, checks and what's in logic, items you just received, open hints, recent
 chat, death link) and where: any corner or either side, with its distance from the edge, size
 and background. It starts switched off.
+
+### Game boxes
+
+Items that belong to other worlds can show as the box of the game they're for, with its cover
+art, instead of a Sol: leaning back as it turns on the ground or in a shop, and upright in
+Link's hands when he picks it up. Covers come from [SteamGridDB](https://www.steamgriddb.com)
+with your own API key, which is free: sign in there, open Preferences, then API. The first time you play, the mod asks whether you want
+game boxes (and takes the key) or Sols; after that it's under **Other players' items** on the
+Status page of the Archipelago tab (F1). Each game's cover downloads once and is kept in
+`randomizer/archipelago/covers` for every room after that. Games SteamGridDB doesn't have (and
+the ones that only exist inside Archipelago) stay Sols, as does everything when there's no key.
+To use your own art for a game, put a PNG or JPG named after the game (as the room lists it) in
+`randomizer/archipelago/covers/custom`.
 
 ## Presets
 
@@ -210,7 +224,9 @@ This fork adds the Archipelago game mode, the network client and the apworld.
 Emoji graphics are [Twemoji](https://github.com/jdecked/twemoji), licensed under
 [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/) (see `res/emoji/LICENSE.txt`), and the
 emoji font is [Twemoji Mozilla](https://github.com/mozilla/twemoji-colr) (Apache 2.0, graphics
-CC-BY 4.0; see `res/fonts/LICENSE.txt`).
+CC-BY 4.0; see `res/fonts/LICENSE.txt`). Images are decoded with
+[stb_image](https://github.com/nothings/stb) (public domain). Box art comes from
+[SteamGridDB](https://www.steamgriddb.com) at play time and isn't part of this project.
 
 ## AI disclosure
 

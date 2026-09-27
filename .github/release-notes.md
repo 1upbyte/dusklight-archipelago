@@ -11,14 +11,13 @@ Then in Dusklight: use the arrows on the Play button to pick **Archipelago**, st
 
 Needs Dusklight 2.0.1 or newer. This mod carries its own copy of the randomizer, so Dusklight's built-in Randomizer doesn't need updating or removing; the two don't interfere.
 
-## What's new in 1.3.0
+## What's new in 1.4.0
 
-- **Hints tab.** Every hint that involves you, your hint points and cost, asking for a hint by item or location, and Priority / No priority / Avoid on hints for your own items. New hints pop up as they arrive.
-- **Emoji.** Emoji show in the message log, pop-ups and the chat box, and an Emoji button adds them to your message.
-- **Overlay.** An optional panel that stays on screen while you play: connection, checks and what's in logic, items you just received, open hints and recent chat. Turn it on and place it from the Overlay page of the Archipelago tab (F1).
+- **Game boxes.** Other players' items can show as the box of the game they're for, with its cover art, instead of a Sol: on the ground, in Link's hands and in the item text box. Covers come from SteamGridDB with your own free API key; the first time you play, the mod asks whether you want boxes (and takes the key) or Sols. Change it any time under **Other players' items** on the Status page of the Archipelago tab (F1). Covers download once per game and are kept for every room after that.
+- Other players' items (boxes and Sols) are drawn at half their old size.
 - The apworld is unchanged (1.7.0).
 
-New in 1.2.0: upstream randomizer 1.0.5 (Midna charge logic, Palace of Twilight and Cave of Ordeals fixes).
+New in 1.3.0: hints tab, emoji, and the optional on-screen overlay.
 
 ## Updating
 

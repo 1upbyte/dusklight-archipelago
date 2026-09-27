@@ -17,6 +17,7 @@ namespace {
 std::unordered_map<std::string, std::unordered_map<int64_t, std::string>> s_itemNames;
 std::unordered_map<std::string, std::unordered_map<int64_t, std::string>> s_locationNames;
 std::unordered_map<int, std::string> s_slotGames;
+std::unordered_map<std::string, std::string> s_slotGamesByName;  // slot name -> game
 
 std::string make_uuid() {
     static std::string uuid;
@@ -44,6 +45,21 @@ const std::string& Client::playerName(int slot) const {
         return mPlayerNames[slot];
     }
     return kEmpty;
+}
+
+std::string Client::gameOfSlotName(const std::string& slotName) const {
+    const auto it = s_slotGamesByName.find(slotName);
+    return it != s_slotGamesByName.end() ? it->second : std::string{};
+}
+
+std::vector<std::string> Client::games() const {
+    std::vector<std::string> out;
+    for (const auto& [slot, game] : s_slotGames) {
+        if (!game.empty() && std::find(out.begin(), out.end(), game) == out.end()) {
+            out.push_back(game);
+        }
+    }
+    return out;
 }
 
 void Client::connect(const ConnectInfo& info) {
@@ -206,9 +222,11 @@ void Client::handle(const json& p) {
             mPlayerNames[s] = pl.value("alias", pl.value("name", ""));
         }
         s_slotGames.clear();
+        s_slotGamesByName.clear();
         if (p.contains("slot_info")) {
             for (const auto& [k, v] : p["slot_info"].items()) {
                 s_slotGames[std::stoi(k)] = v.value("game", "");
+                s_slotGamesByName[v.value("name", "")] = v.value("game", "");
             }
         }
         mState = State::Connected;

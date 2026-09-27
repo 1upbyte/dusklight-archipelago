@@ -2,6 +2,7 @@
 #include "mods/svc/log.h"
 #include "mods/svc/websocket.h"
 #include "mods/svc/net.h"
+#include "mods/svc/http.h"
 
 #include "item.hpp"
 #include "session.hpp"
@@ -23,6 +24,7 @@ IMPORT_SERVICE(GameModeService, svc_game_mode);
 IMPORT_SERVICE(TextureService, svc_texture);
 IMPORT_SERVICE(FileService, svc_file);
 IMPORT_SERVICE(NetService, svc_net);
+IMPORT_OPTIONAL_SERVICE(HttpService, svc_http);  // cover downloads; without it items stay Sols
 
 extern "C" {
 
