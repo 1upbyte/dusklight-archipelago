@@ -4122,11 +4122,8 @@ F_SP122:
         name: htPiece
         parameters: 0xFFFFFFE1
       layers:
-        - 0
-        - 4
+        - 1
         - 6
-        - 13
-        - 14
 
     # Boulder Rupee (Green 1)
     - action: patch
@@ -4147,6 +4144,7 @@ F_SP122:
         parameters: 0xF34AFF01
       layers:
         - 0
+        - 1
         - 4
         - 6
         - 13
@@ -4171,6 +4169,7 @@ F_SP122:
         parameters: 0xF34AFF01
       layers:
         - 0
+        - 1
         - 4
         - 6
         - 13
@@ -4195,6 +4194,7 @@ F_SP122:
         parameters: 0xF34AFF01
       layers:
         - 0
+        - 1
         - 4
         - 6
         - 13
@@ -4219,6 +4219,7 @@ F_SP122:
         parameters: 0xF34AFF02
       layers:
         - 0
+        - 1
         - 4
         - 6
         - 13
@@ -4243,6 +4244,7 @@ F_SP122:
         parameters: 0xF34AFF02
       layers:
         - 0
+        - 1
         - 4
         - 6
         - 13
@@ -4267,6 +4269,7 @@ F_SP122:
         parameters: 0xF34AFF02
       layers:
         - 0
+        - 1
         - 4
         - 6
         - 13
@@ -4291,6 +4294,7 @@ F_SP122:
         parameters: 0xF34AFF03
       layers:
         - 0
+        - 1
         - 4
         - 6
         - 13
@@ -4317,6 +4321,7 @@ F_SP122:
           z: 37038.19140625
       layers:
         - 0
+        - 1
         - 4
         - 6
         - 13
@@ -4338,6 +4343,7 @@ F_SP122:
       set id: 0xFFFF
       layers:
         - 0
+        - 1
         - 4
         - 6
         - 13
@@ -4358,6 +4364,7 @@ F_SP122:
       set id: 0xFFFF
       layers:
         - 0
+        - 1
         - 4
         - 6
         - 13
