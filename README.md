@@ -80,18 +80,23 @@ it's over.
 You can switch it on or off for a save from the **Archipelago** tab in the menu bar (F1),
 whatever the YAML said.
 
-### Tracker and messages
+### Tracker, hints and messages
 
-The **Archipelago** tab in the menu bar (F1) has two more pages for use mid-run:
+The **Archipelago** tab in the menu bar (F1) has more pages for use mid-run:
 
 - **Tracker** shows how many of your checks are done and which ones you can do right now. It
   opens on everything in logic; pick a region to see all of its checks. A green dot is in
   logic, a hollow dot isn't yet, and gray, crossed-out text is done. The logic is the seed's
   own, worked out in the background from the items you have, so "in logic" means the same
   thing it means to Archipelago.
+- **Hints** lists every hint that involves you: where your items are, and which of other
+  players' items are in your world. It shows your hint points and what a hint costs, and lets
+  you ask for one by item or by location. For hints on your own items you can set Priority,
+  No priority or Avoid, like in Archipelago's text client. New hints also pop up as they arrive.
 - **Messages** is everything the room says, newest first, in Archipelago's usual colors: items
-  found and sent, hints, chat. Type in the Message box to chat, or send a server command such as
-  `!hint Clawshot` or `!remaining`.
+  found and sent, hints, chat. Type a message and press Send to chat, or send a server command
+  such as `!remaining`. Emoji show as pictures here and in pop-ups; the Emoji button adds one
+  to your message as a code like `:joy:`, which goes out as the emoji itself.
 
 The tracker needs the save to have connected to its room, which it does by itself when you load
 it.
@@ -193,6 +198,9 @@ that file to refresh them; nothing else needs to change.
 
 The randomizer, its logic data and its generator are by [Twilit Realm](https://github.com/TwilitRealm).
 This fork adds the Archipelago game mode, the network client and the apworld.
+
+Emoji graphics are [Twemoji](https://github.com/jdecked/twemoji), licensed under
+[CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/) (see `res/emoji/LICENSE.txt`).
 
 ## AI disclosure
 

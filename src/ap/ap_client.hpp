@@ -23,6 +23,18 @@ struct NetworkItem {
     int flags = 0;
 };
 
+// One hint, as the server keeps it (NetUtils.Hint).
+struct Hint {
+    int receivingPlayer = 0;
+    int findingPlayer = 0;
+    int64_t location = 0;
+    int64_t item = 0;
+    bool found = false;
+    std::string entrance;
+    int itemFlags = 0;
+    int status = 0;  // HintStatus: 0 unspecified, 10 no priority, 20 avoid, 30 priority, 40 found
+};
+
 struct ConnectInfo {
     std::string server;  // "host:port", optionally with ws:// or wss://
     std::string slot;
@@ -44,6 +56,8 @@ public:
     std::function<void(int index, const std::vector<NetworkItem>& items)> onItems;
     std::function<void(const std::string& text, const json& msg)> onPrint;
     std::function<void(const json& bounced)> onBounced;
+    // Every hint that concerns our slot, whenever the server's list changes.
+    std::function<void(const std::vector<Hint>& hints)> onHints;
     std::function<void(const std::string& reason)> onDisconnected;
 
     void connect(const ConnectInfo& info);
@@ -58,6 +72,8 @@ public:
     // sends ConnectUpdate. "DeathLink" here is what puts us on the death link channel.
     void setTags(const std::vector<std::string>& tags);
     void say(const std::string& text);
+    // Priority / avoid / no priority on a hint for one of our items (UpdateHint).
+    void updateHint(int findingPlayer, int64_t location, int status);
 
     State state() const { return mState; }
     const std::string& lastError() const { return mLastError; }
@@ -65,6 +81,13 @@ public:
     int slot() const { return mSlot; }
     const std::string& playerName(int slot) const;
     const std::string& seedName() const { return mSeedName; }
+    int team() const { return mTeam; }
+    int hintPoints() const { return mHintPoints; }
+    // Points one hint costs this slot (MultiServer.get_hint_cost), 0 if hints are free.
+    int hintCost() const;
+    // Names from the data package, by the game of the slot that owns the id.
+    std::string itemName(int64_t id, int ownerSlot) const;
+    std::string locationName(int64_t id, int ownerSlot) const;
 
     static constexpr const char* kGame = "Twilight Princess (Dusklight)";
 
@@ -76,6 +99,7 @@ private:
     void handle(const json& packet);
     void send(const json& packets);
     std::string nextUrl();
+    static std::vector<Hint> parse_hints(const json& list);
 
     ConnectInfo mInfo{};
     State mState = State::Disconnected;
@@ -86,6 +110,10 @@ private:
     std::vector<std::string> mTags;
     int mSlot = -1;
     std::string mSeedName;
+    int mTeam = 0;
+    int mHintPoints = 0;
+    int mHintCostPercent = 0;
+    size_t mSlotLocations = 0;
     std::vector<std::string> mPlayerNames;
 };
 

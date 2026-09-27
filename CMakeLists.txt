@@ -145,6 +145,7 @@ set(RANDOMIZER_SOURCES
         src/ap/ws_deflate.cpp
         src/ap/ap_mode.cpp
         src/ap/ap_tracker.cpp
+        src/ap/emoji.cpp
 )
 
 # Embed the generator's YAML data into the mod library. Paths are relative to this
@@ -274,6 +275,7 @@ target_compile_definitions(ap_gen_test PRIVATE
 
 # Offline test: drive the TLS client over ordinary sockets, against real servers.
 add_executable(tls_test ${CMAKE_CURRENT_SOURCE_DIR}/tools/tls_test.cpp ${CMAKE_CURRENT_SOURCE_DIR}/src/ap/tls.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/ap/emoji.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/ap/ws_deflate.cpp)
 target_link_libraries(tls_test PRIVATE randomizer_embeds MbedTLS::mbedtls ap_miniz)
 target_include_directories(tls_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/tools)

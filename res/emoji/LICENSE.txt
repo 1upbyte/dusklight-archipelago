@@ -1,0 +1,5 @@
+Emoji graphics: Twemoji v17.0.3, https://github.com/jdecked/twemoji
+Copyright 2019 Twitter, Inc and other contributors; 2024 onward jdecked and contributors.
+Licensed under CC-BY 4.0: https://creativecommons.org/licenses/by/4.0/
+Scaled to 32x32 for the Dusklight Archipelago mod, skin-tone variants left out;
+otherwise unchanged.

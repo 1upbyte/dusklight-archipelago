@@ -11,6 +11,7 @@
 //
 // Exits non-zero if any case did not behave as expected.
 
+#include "ap/emoji.hpp"
 #include "ap/text_safe.hpp"
 #include "ap/tls.hpp"
 #include "ap/ws_deflate.hpp"
@@ -203,6 +204,49 @@ bool check_text_safety() {
     return ok;
 }
 
+// Emoji become inline images (the game's fonts have none); everything else must pass through
+// byte for byte, since this runs on text that has already been escaped for RML.
+bool check_emoji() {
+    const auto img = [](const char* file) {
+        return "<img class=\"ap-emoji\" src=\"" + ap::emoji::image_source(file) +
+               "\" style=\"width: 1.3em; height: 1.3em; vertical-align: -0.25em;\"/>";
+    };
+    struct Check {
+        const char* what;
+        std::string got;
+        std::string expected;
+    };
+    using ap::emoji::emojify;
+    using ap::emoji::shortcodes_to_unicode;
+    const std::vector<Check> checks{
+        {"emoji: plain text untouched", emojify("gg &amp; 12:30:45 caf\xC3\xA9"),
+            "gg &amp; 12:30:45 caf\xC3\xA9"},
+        {"emoji: single codepoint", emojify("hi \xF0\x9F\x98\x82!"), "hi " + img("1f602") + "!"},
+        {"emoji: VS16 dropped for lookup", emojify("\xE2\x9D\xA4\xEF\xB8\x8F"), img("2764")},
+        {"emoji: ZWJ sequence", emojify("\xF0\x9F\x91\xA8\xE2\x80\x8D\xF0\x9F\x92\xBB"),
+            img("1f468-200d-1f4bb")},
+        {"emoji: skin tone -> default", emojify("\xF0\x9F\x91\x8D\xF0\x9F\x8F\xBD"), img("1f44d")},
+        {"emoji: flag pair", emojify("\xF0\x9F\x87\xAF\xF0\x9F\x87\xB5"), img("1f1ef-1f1f5")},
+        {"emoji: keycap", emojify("#\xEF\xB8\x8F\xE2\x83\xA3 5"), img("23-20e3") + " 5"},
+        {"emoji: shortcode shown", emojify("gg :joy: :nope:"), "gg " + img("1f602") + " :nope:"},
+        {"emoji: shortcode sent as emoji", shortcodes_to_unicode(":joy: :heart: :nope:"),
+            "\xF0\x9F\x98\x82 \xE2\x9D\xA4\xEF\xB8\x8F :nope:"},
+        {"emoji: broken utf-8 kept", emojify(std::string("a\xF0\x9F" "b")),
+            std::string("a\xF0\x9F" "b")},
+    };
+    bool ok = true;
+    for (const Check& check : checks) {
+        std::printf("%-32s ", check.what);
+        if (check.got == check.expected) {
+            std::printf("PASS\n");
+        } else {
+            std::printf("FAIL  got '%s'\n", check.got.c_str());
+            ok = false;
+        }
+    }
+    return ok;
+}
+
 #include "deflate_vectors.inc"
 
 // permessage-deflate, against vectors from the same websockets encoder Archipelago's server
@@ -309,6 +353,8 @@ int main(int argc, char** argv) {
     }
 
     int failures = check_text_safety() ? 0 : 1;
+    std::printf("\n");
+    failures += check_emoji() ? 0 : 1;
     std::printf("\n");
     failures += check_deflate() ? 0 : 1;
     std::printf("\n");

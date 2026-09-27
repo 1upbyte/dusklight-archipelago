@@ -1,9 +1,11 @@
 #include "ap_client.hpp"
 
+#include "emoji.hpp"
 #include "text_safe.hpp"
 
 #include <mods/svc/log.hpp>
 
+#include <algorithm>
 #include <memory>
 #include <random>
 #include <unordered_map>
@@ -173,6 +175,7 @@ void Client::handle(const json& p) {
     mods::log::debug("archipelago: <- {}", cmd);
     if (cmd == "RoomInfo") {
         mSeedName = p.value("seed_name", "");
+        mHintCostPercent = p.value("hint_cost", 0);
         json games = p.value("games", json::array());
         // One frame for both: Connect first, then the names for PrintJSON.
         send(json::array({{
@@ -190,6 +193,10 @@ void Client::handle(const json& p) {
         }, {{"cmd", "GetDataPackage"}, {"games", games}}}));
     } else if (cmd == "Connected") {
         mSlot = p.value("slot", -1);
+        mTeam = p.value("team", 0);
+        mHintPoints = p.value("hint_points", 0);
+        mSlotLocations = p.value("missing_locations", json::array()).size() +
+                         p.value("checked_locations", json::array()).size();
         mPlayerNames.clear();
         for (const auto& pl : p.value("players", json::array())) {
             const int s = pl.value("slot", 0);
@@ -208,6 +215,10 @@ void Client::handle(const json& p) {
         if (onConnected) {
             onConnected(p);
         }
+        // Hints live in the server's data storage; read them now and hear about every change.
+        const std::string hintsKey = "_read_hints_" + std::to_string(mTeam) + "_" + std::to_string(mSlot);
+        send(json::array({{{"cmd", "Get"}, {"keys", {hintsKey}}},
+            {{"cmd", "SetNotify"}, {"keys", {hintsKey}}}}));
     } else if (cmd == "ConnectionRefused") {
         std::string errs;
         for (const auto& e : p.value("errors", json::array())) {
@@ -247,7 +258,62 @@ void Client::handle(const json& p) {
         if (onBounced) {
             onBounced(p);
         }
+    } else if (cmd == "RoomUpdate") {
+        if (p.contains("hint_points") && p["hint_points"].is_number_integer()) {
+            mHintPoints = p["hint_points"].get<int>();
+        }
+        if (p.contains("hint_cost") && p["hint_cost"].is_number_integer()) {
+            mHintCostPercent = p["hint_cost"].get<int>();
+        }
+    } else if (cmd == "Retrieved" || cmd == "SetReply") {
+        const std::string hintsKey = "_read_hints_" + std::to_string(mTeam) + "_" + std::to_string(mSlot);
+        const json* value = nullptr;
+        if (cmd == "SetReply" && p.value("key", "") == hintsKey && p.contains("value")) {
+            value = &p["value"];
+        } else if (cmd == "Retrieved" && p.contains("keys") && p["keys"].contains(hintsKey)) {
+            value = &p["keys"][hintsKey];
+        }
+        if (value != nullptr && onHints) {
+            onHints(parse_hints(*value));
+        }
     }
+}
+
+std::vector<Hint> Client::parse_hints(const json& list) {
+    std::vector<Hint> hints;
+    if (!list.is_array()) {
+        return hints;
+    }
+    for (const auto& h : list) {
+        if (!h.is_object()) {
+            continue;
+        }
+        Hint hint;
+        hint.receivingPlayer = h.value("receiving_player", 0);
+        hint.findingPlayer = h.value("finding_player", 0);
+        hint.location = h.value("location", int64_t{0});
+        hint.item = h.value("item", int64_t{0});
+        hint.found = h.value("found", false);
+        hint.entrance = h.value("entrance", "");
+        hint.itemFlags = h.value("item_flags", 0);
+        hint.status = h.value("status", hint.found ? 40 : 0);
+        hints.push_back(std::move(hint));
+    }
+    return hints;
+}
+
+void Client::updateHint(int findingPlayer, int64_t location, int status) {
+    if (mState == State::Connected) {
+        send(json::array({{{"cmd", "UpdateHint"}, {"player", findingPlayer},
+            {"location", location}, {"status", status}}}));
+    }
+}
+
+int Client::hintCost() const {
+    if (mHintCostPercent <= 0) {
+        return 0;
+    }
+    return std::max(1, static_cast<int>(mHintCostPercent * 0.01 * static_cast<double>(mSlotLocations)));
 }
 
 void Client::sendLocations(const std::vector<int64_t>& locations) {
@@ -304,21 +370,35 @@ std::string part_text(const json& part, const Client& client) {
         return name.empty() ? text : name;
     }
     if (type == "item_id" || type == "location_id") {
-        const auto gameIt = s_slotGames.find(part.value("player", 0));
-        const auto& table = type == "item_id" ? s_itemNames : s_locationNames;
         const int64_t id = std::strtoll(text.c_str(), nullptr, 10);
-        if (gameIt != s_slotGames.end()) {
-            if (const auto g = table.find(gameIt->second); g != table.end()) {
-                if (const auto n = g->second.find(id); n != g->second.end()) {
-                    return n->second;
-                }
-            }
-        }
+        const int owner = part.value("player", 0);
+        return type == "item_id" ? client.itemName(id, owner) : client.locationName(id, owner);
     }
     return text;
 }
 
+std::string lookup_name(const std::unordered_map<std::string,
+                            std::unordered_map<int64_t, std::string>>& table,
+    int64_t id, int ownerSlot) {
+    if (const auto gameIt = s_slotGames.find(ownerSlot); gameIt != s_slotGames.end()) {
+        if (const auto g = table.find(gameIt->second); g != table.end()) {
+            if (const auto n = g->second.find(id); n != g->second.end()) {
+                return n->second;
+            }
+        }
+    }
+    return std::to_string(id);
+}
+
 }  // namespace
+
+std::string Client::itemName(int64_t id, int ownerSlot) const {
+    return lookup_name(s_itemNames, id, ownerSlot);
+}
+
+std::string Client::locationName(int64_t id, int ownerSlot) const {
+    return lookup_name(s_locationNames, id, ownerSlot);
+}
 
 std::string flatten_print(const json& data, const Client& client) {
     std::string out;
@@ -332,7 +412,8 @@ std::string print_rml(const json& data, const Client& client) {
     std::string out;
     for (const auto& part : data) {
         const std::string type = part.value("type", "text");
-        const std::string text = rml_escape(message_safe(part_text(part, client), 300));
+        const std::string text =
+            emoji::emojify(rml_escape(message_safe(part_text(part, client), 300)));
         const char* cls = nullptr;
         if (type == "player_id") {
             cls = std::atoi(part.value("text", "").c_str()) == client.slot() ? "ap-me" : "ap-player";

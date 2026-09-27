@@ -2,6 +2,7 @@
 
 #include "ap_client.hpp"
 #include "ap_tracker.hpp"
+#include "emoji.hpp"
 #include "data_version.hpp"
 #include "text_safe.hpp"
 
@@ -48,6 +49,7 @@
 #include <mutex>
 #include <optional>
 #include <thread>
+#include <tuple>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -185,6 +187,13 @@ std::deque<std::string> g_log;              // RML, oldest first
 uint64_t g_logVersion = 1;
 std::string g_chatDraft;
 
+// Hints (the Hints tab): the server's list for our slot, kept current by SetNotify.
+std::vector<Hint> g_hints;          // sorted: open first, by status; found last
+uint64_t g_hintsVersion = 1;
+uint64_t g_selectedHint = 0;        // hint_key() of the hint shown in the details pane
+std::string g_hintItemDraft;
+std::string g_hintLocationDraft;
+
 // Config
 ConfigVarHandle g_cfgServer = 0;
 ConfigVarHandle g_cfgSlot = 0;
@@ -239,8 +248,8 @@ const std::string& item_name(int id) {
 void toast(const std::string& title, const std::string& body, const char* type = nullptr,
     uint32_t ms = 0) {
     // Server chat and refusal messages land here, so bound what we are willing to render.
-    const std::string t = rml_escape(message_safe(title, 80));
-    const std::string b = rml_escape(message_safe(body, 400));
+    const std::string t = emoji::emojify(rml_escape(message_safe(title, 80)));
+    const std::string b = emoji::emojify(rml_escape(message_safe(body, 400)));
     UiToastDesc desc{sizeof(UiToastDesc)};
     desc.type = type;
     desc.title_rml = t.c_str();
@@ -684,10 +693,37 @@ void on_items(int index, const std::vector<NetworkItem>& items) {
     g_serverItems.insert(g_serverItems.end(), items.begin(), items.end());
 }
 
+int hint_rank(const Hint& h) {
+    if (h.found) {
+        return 4;
+    }
+    switch (h.status) {
+    case 30: return 0;  // priority
+    case 0: return 1;   // unspecified
+    case 10: return 2;  // no priority
+    default: return 3;  // avoid
+    }
+}
+
+void on_hints(const std::vector<Hint>& hints) {
+    g_hints = hints;
+    std::stable_sort(g_hints.begin(), g_hints.end(),
+        [](const Hint& a, const Hint& b) { return hint_rank(a) < hint_rank(b); });
+    ++g_hintsVersion;
+}
+
 void on_print(const std::string& text, const json& msg) {
     log_rml(print_rml(msg.value("data", json::array()), g_client));
     const std::string type = msg.value("type", "");
     const int me = g_client.slot();
+    if (type == "Hint" && !msg.value("found", false)) {
+        const int receiver = msg.value("receiving", -1);
+        const int finder = msg.contains("item") ? msg["item"].value("player", -1) : -1;
+        if (receiver == me || finder == me) {
+            toast("Hint", text, nullptr, 6000);
+        }
+        return;
+    }
     if (type == "ItemSend" || type == "ItemCheat") {
         const int receiver = msg.value("receiving", -1);
         const int sender = msg.contains("item") ? msg["item"].value("player", -1) : -1;
@@ -1713,28 +1749,80 @@ std::string log_rml_all() {
     return out;
 }
 
+bool not_connected(ModContext*, void*) {
+    return g_client.state() != State::Connected;
+}
+
+// Chat and server commands. The field only edits the draft; Send sends it, so moving focus
+// away (to the emoji picker, say) never sends half a message.
+void send_chat(ModContext*, void*) {
+    std::string text = message_safe(g_chatDraft, 400);
+    std::erase(text, '\n');
+    const auto first = text.find_first_not_of(' ');
+    if (first != std::string::npos && g_client.state() == State::Connected) {
+        g_client.say(emoji::shortcodes_to_unicode(text.substr(first)));
+        g_chatDraft.clear();
+    }
+}
+
+ModResult build_emoji_picker(ModContext* ctx, UiElementHandle pane, void*, ModError*) {
+    svc_mng.ui->pane_add_text(ctx, pane, "Pick one to add it to your message.", nullptr);
+    UiRowDesc rowDesc = UI_ROW_DESC_INIT;
+    rowDesc.wrap = true;
+    UiElementHandle row = 0;
+    svc_mng.ui->pane_add_row(ctx, pane, &rowDesc, &row);
+    for (const auto& e : emoji::picker()) {
+        UiControlDesc b = UI_CONTROL_DESC_INIT;
+        b.kind = UI_CONTROL_BUTTON;
+        b.label = e.name;
+        b.user_data = const_cast<emoji::PickerEmoji*>(&e);
+        b.on_pressed = [](ModContext*, void* ud) {
+            const auto* pick = static_cast<const emoji::PickerEmoji*>(ud);
+            if (!g_chatDraft.empty() && g_chatDraft.back() != ' ') {
+                g_chatDraft += ' ';
+            }
+            g_chatDraft += fmt::format(":{}: ", pick->name);
+        };
+        UiElementHandle elem = 0;
+        svc_mng.ui->pane_add_control(ctx, row, &b, &elem);
+        if (elem != 0) {
+            svc_mng.ui->elem_set_class(ctx, elem, "ap-emoji-btn", true);
+            svc_mng.ui->elem_set_class(ctx, elem, fmt::format("ap-e-{}", e.file).c_str(), true);
+        }
+    }
+    return MOD_OK;
+}
+
 ModResult build_messages_tab(ModContext* ctx, UiWindowHandle, UiElementHandle left,
-    UiElementHandle, void*, ModError*) {
+    UiElementHandle right, void*, ModError*) {
     UiControlDesc say = UI_CONTROL_DESC_INIT;
     say.kind = UI_CONTROL_STRING;
     say.label = "Message";
     say.help_rml = "Chat with everyone in the room, or send a server command such as "
                    "<b>!hint</b> <i>item name</i>, <b>!remaining</b> or <b>!help</b>. "
-                   "Confirm to send.";
+                   "Emoji codes like <b>:joy:</b> are sent as the emoji.";
     say.max_length = 400;
     say.get = get_str;
+    say.set = set_str;
     say.user_data = &g_chatDraft;
-    say.set = [](ModContext*, void*, const UiControlValue* v) {
-        std::string text = message_safe(v->string_value != nullptr ? v->string_value : "", 400);
-        std::erase(text, '\n');
-        const auto first = text.find_first_not_of(' ');
-        if (first != std::string::npos && g_client.state() == State::Connected) {
-            g_client.say(text.substr(first));
-        }
-        g_chatDraft.clear();
-    };
-    say.is_disabled = [](ModContext*, void*) { return g_client.state() != State::Connected; };
+    say.string_set_mode = UI_STRING_SET_ON_CHANGE;
+    say.is_disabled = not_connected;
     svc_mng.ui->pane_add_control(ctx, left, &say, nullptr);
+
+    UiRowDesc rowDesc = UI_ROW_DESC_INIT;
+    UiElementHandle row = 0;
+    svc_mng.ui->pane_add_row(ctx, left, &rowDesc, &row);
+    UiControlDesc send = UI_CONTROL_DESC_INIT;
+    send.kind = UI_CONTROL_BUTTON;
+    send.label = "Send";
+    send.on_pressed = send_chat;
+    send.is_disabled = not_connected;
+    svc_mng.ui->pane_add_control(ctx, row, &send, nullptr);
+    UiGroupDesc picker = UI_GROUP_DESC_INIT;
+    picker.label = "Emoji";
+    picker.build = build_emoji_picker;
+    svc_mng.ui->pane_add_group(ctx, row, right, &picker, nullptr);
+
     g_logElem = 0;
     svc_mng.ui->pane_add_rml(ctx, left, log_rml_all().c_str(), &g_logElem);
     g_logShown = g_logVersion;
@@ -1745,6 +1833,242 @@ ModResult update_messages_tab(ModContext* ctx, void*, ModError*) {
     if (g_logElem != 0 && g_logShown != g_logVersion) {
         g_logShown = g_logVersion;
         svc_mng.ui->elem_set_rml(ctx, g_logElem, log_rml_all().c_str());
+    }
+    return MOD_OK;
+}
+
+// Hints tab
+UiElementHandle g_hintsSummary = 0;
+UiListHandle g_hintsList = 0;
+UiElementHandle g_hintDetails = 0;
+std::tuple<uint64_t, uint64_t, int> g_hintsShown{0, 0, -1};
+std::vector<std::string> g_hintLabels;  // backing store for the list's labels
+
+uint64_t hint_key(const Hint& h) {
+    return (static_cast<uint64_t>(h.findingPlayer) << 48) ^ static_cast<uint64_t>(h.location);
+}
+
+const Hint* selected_hint() {
+    for (const auto& h : g_hints) {
+        if (hint_key(h) == g_selectedHint) {
+            return &h;
+        }
+    }
+    return nullptr;
+}
+
+const char* hint_status_name(const Hint& h) {
+    if (h.found) {
+        return "found";
+    }
+    switch (h.status) {
+    case 30: return "priority";
+    case 20: return "avoid";
+    case 10: return "no priority";
+    default: return "unspecified";
+    }
+}
+
+std::string player_label(int slot) {
+    if (slot == g_client.slot()) {
+        return "you";
+    }
+    const auto& name = g_client.playerName(slot);
+    return name.empty() ? fmt::format("player {}", slot) : name;
+}
+
+std::string hint_label(const Hint& h) {
+    const int me = g_client.slot();
+    const std::string item = g_client.itemName(h.item, h.receivingPlayer);
+    const std::string where = g_client.locationName(h.location, h.findingPlayer);
+    std::string label = h.receivingPlayer == me
+        ? fmt::format("{}: {} ({})", item, where,
+              h.findingPlayer == me ? "your world" : player_label(h.findingPlayer) + "'s world")
+        : fmt::format("{}'s {}: {} (your world)", player_label(h.receivingPlayer), item, where);
+    label += fmt::format("  [{}]", hint_status_name(h));
+    return message_safe(label, 200);
+}
+
+std::string hints_summary() {
+    if (g_client.state() != State::Connected) {
+        return "Connect to your room to see and ask for hints.";
+    }
+    const int cost = g_client.hintCost();
+    std::string s = cost == 0 ? fmt::format("Hint points: {}. Hints are free in this room.",
+                                    g_client.hintPoints())
+                              : fmt::format("Hint points: {}. A hint costs {}.",
+                                    g_client.hintPoints(), cost);
+    const size_t open = std::ranges::count_if(g_hints, [](const Hint& h) { return !h.found; });
+    s += fmt::format("\n{} hint{} still open.", open, open == 1 ? "" : "s");
+    return s;
+}
+
+std::string hint_details_rml() {
+    const Hint* h = selected_hint();
+    if (h == nullptr) {
+        return R"(<div class="ap-quiet">Pick a hint to see it here. For hints on your own items you can set a priority, which shows for the player who has to find it.</div>)";
+    }
+    const int flags = h->itemFlags;
+    const char* itemClass = (flags & 1) ? "ap-prog" : (flags & 2) ? "ap-useful" : (flags & 4) ? "ap-trap" : "ap-item";
+    auto player = [](int slot) {
+        return fmt::format(R"(<span class="{}">{}</span>)",
+            slot == g_client.slot() ? "ap-me" : "ap-player",
+            emoji::emojify(rml_escape(message_safe(player_label(slot), 60))));
+    };
+    std::string out = fmt::format(R"(<div class="ap-head">{}</div>)",
+        rml_escape(h->found ? "Found" : "Hint"));
+    out += fmt::format(R"(<div class="ap-msg"><span class="{}">{}</span> for {}</div>)", itemClass,
+        rml_escape(message_safe(g_client.itemName(h->item, h->receivingPlayer), 120)),
+        player(h->receivingPlayer));
+    out += fmt::format(R"(<div class="ap-msg">at <span class="ap-loc">{}</span> in {} world</div>)",
+        rml_escape(message_safe(g_client.locationName(h->location, h->findingPlayer), 120)),
+        h->findingPlayer == g_client.slot() ? std::string{"your"} : player(h->findingPlayer) + "'s");
+    if (!h->entrance.empty()) {
+        out += fmt::format(R"(<div class="ap-msg">through <span class="ap-ent">{}</span></div>)",
+            rml_escape(message_safe(h->entrance, 120)));
+    }
+    out += fmt::format(R"(<div class="ap-msg">Status: {}</div>)", hint_status_name(*h));
+    return out;
+}
+
+void refresh_hints_list(ModContext* ctx) {
+    g_hintLabels.clear();
+    g_hintLabels.reserve(g_hints.size());
+    std::vector<UiListItem> items;
+    items.reserve(g_hints.size());
+    for (const auto& h : g_hints) {
+        g_hintLabels.push_back(hint_label(h));
+        UiListItem item = UI_LIST_ITEM_INIT;
+        item.key = hint_key(h);
+        item.label = g_hintLabels.back().c_str();
+        items.push_back(item);
+    }
+    if (g_hintsList != 0) {
+        svc_mng.ui->list_set_items(ctx, g_hintsList, items.data(), items.size());
+    }
+}
+
+// Setting a priority is only for hints on our own items that nobody has found yet.
+bool status_locked(ModContext*, void*) {
+    const Hint* h = selected_hint();
+    return h == nullptr || h->found || h->receivingPlayer != g_client.slot() ||
+           g_client.state() != State::Connected;
+}
+
+void add_status_button(ModContext* ctx, UiElementHandle row, const char* label, int status) {
+    UiControlDesc b = UI_CONTROL_DESC_INIT;
+    b.kind = UI_CONTROL_BUTTON;
+    b.label = label;
+    b.user_data = reinterpret_cast<void*>(static_cast<intptr_t>(status));
+    b.on_pressed = [](ModContext*, void* ud) {
+        if (const Hint* h = selected_hint(); h != nullptr) {
+            g_client.updateHint(h->findingPlayer, h->location,
+                static_cast<int>(reinterpret_cast<intptr_t>(ud)));
+        }
+    };
+    b.is_disabled = status_locked;
+    b.is_selected = [](ModContext*, void* ud) {
+        const Hint* h = selected_hint();
+        return h != nullptr && !h->found && h->status == static_cast<int>(reinterpret_cast<intptr_t>(ud));
+    };
+    svc_mng.ui->pane_add_control(ctx, row, &b, nullptr);
+}
+
+void ask_for_hint(const std::string& command, std::string& draft) {
+    std::string text = message_safe(draft, 200);
+    std::erase(text, '\n');
+    const auto first = text.find_first_not_of(' ');
+    if (first != std::string::npos && g_client.state() == State::Connected) {
+        g_client.say(command + text.substr(first));
+        draft.clear();
+    }
+}
+
+ModResult build_hints_tab(ModContext* ctx, UiWindowHandle, UiElementHandle left,
+    UiElementHandle right, void*, ModError*) {
+    g_hintsSummary = g_hintDetails = 0;
+    g_hintsList = 0;
+    svc_mng.ui->pane_add_text(ctx, left, hints_summary().c_str(), &g_hintsSummary);
+
+    struct Ask {
+        const char* label;
+        const char* help;
+        const char* button;
+        const char* command;
+        std::string* draft;
+    };
+    static const Ask asks[] = {
+        {"Item", "The name of one of your items. The server says where it is, for the hint cost.",
+            "Hint this item", "!hint ", &g_hintItemDraft},
+        {"Location", "The name of one of your locations. The server says what's there.",
+            "Hint this location", "!hint_location ", &g_hintLocationDraft},
+    };
+    for (const auto& ask : asks) {
+        UiControlDesc field = UI_CONTROL_DESC_INIT;
+        field.kind = UI_CONTROL_STRING;
+        field.label = ask.label;
+        field.help_rml = ask.help;
+        field.max_length = 200;
+        field.get = get_str;
+        field.set = set_str;
+        field.user_data = ask.draft;
+        field.string_set_mode = UI_STRING_SET_ON_CHANGE;
+        field.is_disabled = not_connected;
+        svc_mng.ui->pane_add_control(ctx, left, &field, nullptr);
+        UiControlDesc go = UI_CONTROL_DESC_INIT;
+        go.kind = UI_CONTROL_BUTTON;
+        go.label = ask.button;
+        go.user_data = const_cast<Ask*>(&ask);
+        go.on_pressed = [](ModContext*, void* ud) {
+            const auto* a = static_cast<const Ask*>(ud);
+            ask_for_hint(a->command, *a->draft);
+        };
+        go.is_disabled = not_connected;
+        svc_mng.ui->pane_add_control(ctx, left, &go, nullptr);
+    }
+
+    svc_mng.ui->pane_add_section(ctx, left, "Hints");
+    UiListDesc list = UI_LIST_DESC_INIT;
+    list.on_pressed = [](ModContext* c, UiListHandle, uint64_t key, void*) {
+        g_selectedHint = key;
+        if (g_hintDetails != 0) {
+            svc_mng.ui->elem_set_rml(c, g_hintDetails, hint_details_rml().c_str());
+        }
+    };
+    list.is_selected = [](ModContext*, UiListHandle, uint64_t key, void*) {
+        return key == g_selectedHint;
+    };
+    svc_mng.ui->pane_add_list(ctx, left, &list, &g_hintsList);
+    refresh_hints_list(ctx);
+
+    svc_mng.ui->pane_add_rml(ctx, right, hint_details_rml().c_str(), &g_hintDetails);
+    UiRowDesc rowDesc = UI_ROW_DESC_INIT;
+    rowDesc.wrap = true;
+    UiElementHandle row = 0;
+    svc_mng.ui->pane_add_row(ctx, right, &rowDesc, &row);
+    add_status_button(ctx, row, "Priority", 30);
+    add_status_button(ctx, row, "No priority", 10);
+    add_status_button(ctx, row, "Avoid", 20);
+    g_hintsShown = {g_hintsVersion, g_selectedHint, g_client.hintPoints()};
+    return MOD_OK;
+}
+
+ModResult update_hints_tab(ModContext* ctx, void*, ModError*) {
+    const std::tuple<uint64_t, uint64_t, int> now{g_hintsVersion, g_selectedHint,
+        g_client.state() == State::Connected ? g_client.hintPoints() : -1};
+    if (now == g_hintsShown) {
+        return MOD_OK;
+    }
+    const bool listChanged = std::get<0>(now) != std::get<0>(g_hintsShown);
+    g_hintsShown = now;
+    if (g_hintsSummary != 0) {
+        svc_mng.ui->elem_set_text(ctx, g_hintsSummary, hints_summary().c_str());
+    }
+    if (listChanged) {
+        refresh_hints_list(ctx);
+    }
+    if (g_hintDetails != 0) {
+        svc_mng.ui->elem_set_rml(ctx, g_hintDetails, hint_details_rml().c_str());
     }
     return MOD_OK;
 }
@@ -1852,26 +2176,42 @@ ModResult update_status_tab(ModContext* ctx, void*, ModError*) {
 }
 
 void open_status_window(ModContext*, void*) {
-    static UiTabDesc tabs[3] = {UI_TAB_DESC_INIT, UI_TAB_DESC_INIT, UI_TAB_DESC_INIT};
+    static UiTabDesc tabs[4] = {UI_TAB_DESC_INIT, UI_TAB_DESC_INIT, UI_TAB_DESC_INIT,
+        UI_TAB_DESC_INIT};
     tabs[0].title = "Status";
     tabs[0].build = build_status_tab;
     tabs[0].update = update_status_tab;
     tabs[1].title = "Tracker";
     tabs[1].build = build_tracker_tab;
     tabs[1].update = update_tracker_tab;
-    tabs[2].title = "Messages";
-    tabs[2].build = build_messages_tab;
-    tabs[2].update = update_messages_tab;
+    tabs[2].title = "Hints";
+    tabs[2].build = build_hints_tab;
+    tabs[2].update = update_hints_tab;
+    tabs[3].title = "Messages";
+    tabs[3].build = build_messages_tab;
+    tabs[3].update = update_messages_tab;
+    // The picker's buttons show their emoji as a background image.
+    static const std::string rcss = [] {
+        std::string out = kWindowRcss;
+        out += ".ap-emoji-btn { padding-left: 42dp; font-size: 15dp; text-align: left; }\n";
+        for (const auto& e : emoji::picker()) {
+            out += fmt::format(".ap-e-{} {{ decorator: image({} contain left center); }}\n", e.file,
+                emoji::image_source(e.file));
+        }
+        return out;
+    }();
     UiWindowDesc desc = UI_WINDOW_DESC_INIT;
     desc.tabs = tabs;
-    desc.tab_count = 3;
-    desc.rcss = kWindowRcss;
+    desc.tab_count = 4;
+    desc.rcss = rcss.c_str();
     desc.on_closed = [](ModContext*, UiWindowHandle, void*) {
         g_statusWindow = 0;
         g_statusWindowText = 0;
         g_trackerSummary = g_trackerProgress = g_trackerList = 0;
         g_trackerGroups.clear();
         g_logElem = 0;
+        g_hintsSummary = g_hintDetails = 0;
+        g_hintsList = 0;
     };
     svc_mng.ui->window_push(svc_mng.mod_ctx, &desc, &g_statusWindow);
 }
@@ -1899,6 +2239,7 @@ GameModeDesc game_mode_desc() {
 ModResult activate() {
     g_client.onConnected = on_connected;
     g_client.onItems = on_items;
+    g_client.onHints = on_hints;
     g_client.onPrint = on_print;
     g_client.onDisconnected = on_disconnected;
     g_client.onBounced = on_bounced;
@@ -1960,6 +2301,9 @@ void deactivate() {
     g_client.disconnect();
     reset_tracker();
     g_log.clear();
+    g_hints.clear();
+    g_selectedHint = 0;
+    ++g_hintsVersion;
     g_textOverrides.clear();
     if (g_resolver != 0) {
         svc_mng.item->clear_check_resolver(svc_mng.mod_ctx, g_resolver);
