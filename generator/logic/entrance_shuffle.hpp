@@ -28,7 +28,7 @@ namespace randomizer::logic::entrance_shuffle
                          const item_pool::ItemPool& completeItemPool);
 
     void CheckEntrancesCompatibility(const entrance::Entrance* entrance,
-                                     const entrance::Entrance* target);
+                                     entrance::Entrance* target);
     void ChangeConnections(entrance::Entrance* entrance, entrance::Entrance* target);
     void RestoreConnections(entrance::Entrance* entrance, entrance::Entrance* target);
     void ConfirmReplacement(entrance::Entrance* entrance, entrance::Entrance* target);

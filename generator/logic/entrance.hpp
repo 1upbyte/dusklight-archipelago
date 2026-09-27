@@ -122,7 +122,7 @@ namespace randomizer::logic::entrance
         bool IsTarget() const;
 
         void SetReplaces(Entrance* replaces);
-        Entrance* GetReplaces() const;
+        Entrance* GetReplaces(bool vanillaIfNotShuffled = false);
         void SetReverse(Entrance* reverse);
         Entrance* GetReverse() const;
         Entrance* GetAssumed() const;

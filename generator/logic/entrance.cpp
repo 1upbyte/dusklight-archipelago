@@ -284,8 +284,11 @@ namespace randomizer::logic::entrance
         }
     }
 
-    Entrance* Entrance::GetReplaces() const
+    Entrance* Entrance::GetReplaces(bool vanillaIfNotShuffled)
     {
+        if (vanillaIfNotShuffled && !this->_shuffled) {
+            return this;
+        }
         return this->_replaces;
     }
 

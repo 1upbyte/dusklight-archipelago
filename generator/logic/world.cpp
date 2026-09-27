@@ -1404,7 +1404,6 @@ namespace randomizer::logic::world
     }
 
     bool World::AdjustBossReturns() {
-        return Setting("Randomize Dungeon Entrances") == "On" &&
-               Setting("Randomize Boss Entrances") == "On" && Setting("Decouple Entrances") == "Off";
+        return Setting("Randomize Dungeon Entrances") == "On" && Setting("Decouple Entrances") == "Off";
     }
 } // namespace randomizer::logic::world
