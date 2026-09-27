@@ -1826,9 +1826,6 @@ ModResult build_messages_tab(ModContext* ctx, UiWindowHandle, UiElementHandle le
     UiControlDesc say = UI_CONTROL_DESC_INIT;
     say.kind = UI_CONTROL_STRING;
     say.label = "Message";
-    say.help_rml = "Chat with everyone in the room, or send a server command such as "
-                   "<b>!hint</b> <i>item name</i>, <b>!remaining</b> or <b>!help</b>. "
-                   "Emoji codes like <b>:joy:</b> are sent as the emoji.";
     say.max_length = 400;
     say.get = get_str;
     say.set = set_str;
@@ -1850,6 +1847,11 @@ ModResult build_messages_tab(ModContext* ctx, UiWindowHandle, UiElementHandle le
     picker.label = "Emoji";
     picker.build = build_emoji_picker;
     svc_mng.ui->pane_add_group(ctx, row, right, &picker, nullptr);
+    // Guidance as text rather than help_rml: a control's help would replace the picker.
+    svc_mng.ui->pane_add_text(ctx, left,
+        "Chat with the room, or send a server command such as !remaining or !help. Emoji codes "
+        "like :joy: go out as the emoji.",
+        nullptr);
 
     g_logElem = 0;
     svc_mng.ui->pane_add_rml(ctx, left, log_rml_all().c_str(), &g_logElem);
@@ -2018,24 +2020,26 @@ ModResult build_hints_tab(ModContext* ctx, UiWindowHandle, UiElementHandle left,
     g_hintsList = 0;
     svc_mng.ui->pane_add_text(ctx, left, hints_summary().c_str(), &g_hintsSummary);
 
+    // No help_rml on this tab's controls: a control's help replaces the right pane, and that's
+    // where the hint details and priority buttons live.
+    svc_mng.ui->pane_add_text(ctx, left,
+        "Ask where one of your items is, or what's at one of your locations. Each hint costs "
+        "hint points.",
+        nullptr);
     struct Ask {
         const char* label;
-        const char* help;
         const char* button;
         const char* command;
         std::string* draft;
     };
     static const Ask asks[] = {
-        {"Item", "The name of one of your items. The server says where it is, for the hint cost.",
-            "Hint this item", "!hint ", &g_hintItemDraft},
-        {"Location", "The name of one of your locations. The server says what's there.",
-            "Hint this location", "!hint_location ", &g_hintLocationDraft},
+        {"Item", "Hint this item", "!hint ", &g_hintItemDraft},
+        {"Location", "Hint this location", "!hint_location ", &g_hintLocationDraft},
     };
     for (const auto& ask : asks) {
         UiControlDesc field = UI_CONTROL_DESC_INIT;
         field.kind = UI_CONTROL_STRING;
         field.label = ask.label;
-        field.help_rml = ask.help;
         field.max_length = 200;
         field.get = get_str;
         field.set = set_str;
