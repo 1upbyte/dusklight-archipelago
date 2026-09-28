@@ -333,12 +333,16 @@ namespace randomizer::logic::entrance_shuffle
             for (auto& entrance : entrancePools.at(DUNGEON)) {
                 if (entrance->GetBossEntrance()) {
                     entrance->GetBossEntrance()->SetDecoupled(true);
+                    entrance->GetBossEntrance()->GetReverse()->SetDecoupled(true);
+                    entrance->GetBossEntrance()->GetReverse()->SetShuffled(true);
                     entrancePools[BOSS_REVERSE].push_back(entrance->GetBossEntrance()->GetReverse());
                 }
             }
 
-            for (auto& entrance : entrancePools.at(BOSS)) {
-                entrance->GetReverse()->SetDecoupled(true);
+            if (entrancePools.contains(BOSS)) {
+                for (auto& entrance : entrancePools.at(BOSS)) {
+                    entrance->GetReverse()->SetDecoupled(true);
+                }
             }
         }
 
@@ -756,7 +760,7 @@ namespace randomizer::logic::entrance_shuffle
         return false;
     }
 
-    void CheckEntrancesCompatibility(const Entrance* entrance, const Entrance* target)
+    void CheckEntrancesCompatibility(const Entrance* entrance, Entrance* target)
     {
         if (entrance->GetReverse() && entrance->GetReverse() == target->GetReplaces())
         {
@@ -814,7 +818,7 @@ namespace randomizer::logic::entrance_shuffle
         if (bossEntrance)
         {
             // TODO: Properly account for this without needing to also plandomize the boss entrance
-            if (!bossEntrance->GetReplaces()) {
+            if (!bossEntrance->GetReplaces(true)) {
                 throw std::runtime_error("Randomized boss entrance is not set for plandomized dungeon connection " +
                     entrance->GetCurrentName() + ". Please plandomize the associated boss connection as well.");
             }
@@ -825,11 +829,11 @@ namespace randomizer::logic::entrance_shuffle
             // just use the reverse of entering the dungeon (i.e. falling into Lake Hylia when exiting CitS)
             if (entrance->GetBossEntrance()) {
                 auto bossReturn = entrance->GetBossEntrance()->GetReverse();
-                ChangeConnections(bossEntrance->GetReplaces()->GetReverse(), bossReturn->GetAssumed());
+                ChangeConnections(bossEntrance->GetReplaces(true)->GetReverse(), bossReturn->GetAssumed());
             } else {
                 auto bossReturn = entrance->GetReverse();
-                bossEntrance->GetReplaces()->GetReverse()->Connect(bossReturn->GetOriginalConnectedArea());
-                bossEntrance->GetReplaces()->GetReverse()->SetReplaces(bossReturn);
+                bossEntrance->GetReplaces(true)->GetReverse()->Connect(bossReturn->GetOriginalConnectedArea());
+                bossEntrance->GetReplaces(true)->GetReverse()->SetReplaces(bossReturn);
             }
 
             // Special case where we need to also set the entrance returning from the mirror chamber
@@ -841,7 +845,8 @@ namespace randomizer::logic::entrance_shuffle
                     mirrorToAG->Disconnect();
                 }
                 mirrorToAG->Connect(entrance->GetReplaces()->GetBossEntrance()->GetConnectedArea());
-                mirrorToAG->SetReplaces(entrance->GetReplaces()->GetBossEntrance()->GetReplaces());
+                mirrorToAG->SetReplaces(entrance->GetReplaces()->GetBossEntrance()->GetReplaces(true));
+                mirrorToAG->SetShuffled(true);
             }
         } else if (entrance->GetBossEntrance()) {
             entrance->GetBossEntrance()->GetReverse()->GetAssumed()->Disconnect();
@@ -858,10 +863,10 @@ namespace randomizer::logic::entrance_shuffle
         {
             if (entrance->GetBossEntrance()) {
                 auto bossReturn = entrance->GetBossEntrance()->GetReverse();
-                RestoreConnections(bossEntrance->GetReplaces()->GetReverse(), bossReturn->GetAssumed());
+                RestoreConnections(bossEntrance->GetReplaces(true)->GetReverse(), bossReturn->GetAssumed());
             } else {
-                bossEntrance->GetReplaces()->GetReverse()->Disconnect();
-                bossEntrance->GetReplaces()->GetReverse()->SetReplaces(nullptr);
+                bossEntrance->GetReplaces(true)->GetReverse()->Disconnect();
+                bossEntrance->GetReplaces(true)->GetReverse()->SetReplaces(nullptr);
             }
             if (entrance->GetAlias() == "Outside Arbiters Grounds -> Arbiters Grounds") {
                 auto mirrorToAG = entrance->GetWorld()->GetEntrance("Mirror Chamber Lower -> Arbiters Grounds Boss Room");
@@ -883,7 +888,7 @@ namespace randomizer::logic::entrance_shuffle
         {
             if (entrance->GetBossEntrance()) {
                 auto bossReturn = entrance->GetBossEntrance()->GetReverse();
-                ConfirmReplacement(bossEntrance->GetReplaces()->GetReverse(), bossReturn->GetAssumed());
+                ConfirmReplacement(bossEntrance->GetReplaces(true)->GetReverse(), bossReturn->GetAssumed());
             }
         } else if (entrance->GetBossEntrance()) {
             DeleteTargetEntrance(entrance->GetBossEntrance()->GetReverse()->GetAssumed());

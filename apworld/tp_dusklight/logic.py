@@ -2,7 +2,7 @@
 
 Requirements are parsed exactly like the C++ parser does, then compiled into AP rule
 closures. Setting comparisons fold to constants at compile time, and form/time predicates
-(Human_Link, Wolf_Link, Day, Night, Twilight) fold to constants for a fixed form-time
+(Human_Link, Wolf_Link, Day, Night, Twilight_Wolf, Twilight_Human) fold to constants for a fixed form-time
 (exits) or become region-reachability checks for an area's union of form-times
 (locations and events), mirroring how the C++ search evaluates each.
 """
@@ -26,10 +26,14 @@ WOLF = WOLF_DAY | WOLF_NIGHT
 DAY = HUMAN_DAY | WOLF_DAY
 NIGHT = HUMAN_NIGHT | WOLF_NIGHT
 ALL = 0b1111
-TWILIGHT = 0b10000
+# In an uncleared twilight, Link is there as a wolf or as a human (requirement.hpp).
+TWILIGHT_WOLF = 0b10000
+TWILIGHT_HUMAN = 0b100000
+TWILIGHTS = (TWILIGHT_WOLF, TWILIGHT_HUMAN)
 FORM_TIMES = (HUMAN_DAY, HUMAN_NIGHT, WOLF_DAY, WOLF_NIGHT)
 FORM_NAMES = {HUMAN_DAY: "Human Day", HUMAN_NIGHT: "Human Night", WOLF_DAY: "Wolf Day",
-              WOLF_NIGHT: "Wolf Night", TWILIGHT: "Twilight"}
+              WOLF_NIGHT: "Wolf Night", TWILIGHT_WOLF: "Twilight Wolf",
+              TWILIGHT_HUMAN: "Twilight Human"}
 
 DUNGEON_COMPLETION_EVENTS = tuple(f"Can Complete {d}" for d in data.DUNGEONS if d != "Hyrule Castle")
 
@@ -130,8 +134,10 @@ class Parser:
                 return ("human",)
             if arg == "Wolf Link":
                 return ("wolf",)
-            if arg == "Twilight":
-                return ("twilight",)
+            if arg == "Twilight Wolf":
+                return ("twilight_wolf",)
+            if arg == "Twilight Human":
+                return ("twilight_human",)
             if arg.startswith("'"):
                 name = arg[1:-1]
                 self.referenced_events.add(name)
@@ -197,7 +203,8 @@ class AreaForms:
     wolf: Rule
     day: Rule
     night: Rule
-    twilight: Rule
+    twilight_wolf: Rule
+    twilight_human: Rule
 
 
 class Compiler:
@@ -283,9 +290,10 @@ class Compiler:
                 rule = self.compile(self.parser.parse_macro(node[1]), forms)
                 self._macro_cache[key] = rule
             return rule
-        if kind in ("human", "wolf", "day", "night", "twilight"):
+        if kind in ("human", "wolf", "day", "night", "twilight_wolf", "twilight_human"):
             if isinstance(forms, int):
-                mask = {"human": HUMAN, "wolf": WOLF, "day": DAY, "night": NIGHT, "twilight": TWILIGHT}[kind]
+                mask = {"human": HUMAN, "wolf": WOLF, "day": DAY, "night": NIGHT,
+                        "twilight_wolf": TWILIGHT_WOLF, "twilight_human": TWILIGHT_HUMAN}[kind]
                 return bool(forms & mask)
             return getattr(forms, kind)
         if kind == "hearts":

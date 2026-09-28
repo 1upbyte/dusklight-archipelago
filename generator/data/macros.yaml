@@ -3,9 +3,9 @@
 # not need any code modifications to run. Simply add them here and they can be used
 # in the world graph files.
 
-Can Open Doors: Human_Link
-Can Climb Ladders: Human_Link
-Can Climb Vines: Human_Link
+Can Open Doors: Human_Link or Twilight_Human
+Can Climb Ladders: Human_Link or Twilight_Human
+Can Climb Vines: Human_Link or Twilight_Human
 Can Talk to Humans: Human_Link
 Can Swing on Monkeys: Human_Link
 Can Pickup Bomblings: Human_Link
@@ -14,7 +14,7 @@ Can Pull Blocks: Human_Link
 Can Ride Boars: Human_Link
 Can Summon Hawk: Human_Link
 Can Talk to Animals: Wolf_Link
-Can Use Senses: Wolf_Link
+Can Use Senses: Wolf_Link or Twilight_Wolf
 Can Dig: Wolf_Link
 Can Howl: Wolf_Link
 Can Sniff: Wolf_Link
@@ -109,9 +109,9 @@ Can Complete Lanayru Twilight: Lanayru_Twilight_Cleared == On or count(Lanayru_T
 Can Complete All Twilight: Can_Complete_Faron_Twilight and Can_Complete_Eldin_Twilight and Can_Complete_Lanayru_Twilight
 Can Complete MDH: Skip_Midna's_Desperate_Hour == On or ('Can_Access_Castle_Town_South' and 'Can_Complete_Lakebed_Temple')
 
-Can Defeat Faron Twilit Insect: Twilight
-Can Defeat Eldin Twilit Insect: Twilight and (Shadow_Crystal or 'Can_Access_Faron_Field')
-Can Defeat Lanayru Twilit Insect: Twilight and Can_Complete_Eldin_Twilight and (Shadow_Crystal or 'Can_Access_North_Eldin_Field')
+Can Defeat Faron Twilit Insect: Twilight_Wolf
+Can Defeat Eldin Twilit Insect: Twilight_Wolf and 'Can_Start_Eldin_Twilight'
+Can Defeat Lanayru Twilit Insect: Twilight_Wolf and 'Can_Start_Lanayru_Twilight'
 
 Can Midna Charge: Wolf_Link and Can_Complete_MDH and Can_Complete_All_Twilight
 

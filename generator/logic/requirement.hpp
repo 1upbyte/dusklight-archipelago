@@ -49,7 +49,8 @@ namespace randomizer::logic::requirement
         NIGHT,
         HUMAN_LINK,
         WOLF_LINK,
-        TWILIGHT,
+        TWILIGHT_WOLF,
+        TWILIGHT_HUMAN,
         GOLDEN_BUGS,
         HEARTS,
         DUNGEONS_COMPLETED,
@@ -79,7 +80,8 @@ namespace randomizer::logic::requirement
             DAY = HUMAN_DAY | WOLF_DAY,
             NIGHT = HUMAN_NIGHT | WOLF_NIGHT,
             ALL = 0b1111,
-            TWILIGHT = 0b10000,
+            TWILIGHT_WOLF = 0b10000,
+            TWILIGHT_HUMAN = 0b100000,
         };
 
         extern const std::vector<int> ALL_FORM_TIMES;
@@ -123,7 +125,7 @@ namespace randomizer::logic::requirement
                                        world::World*);
     EvalSuccess EvaluateEventRequirement(search::Search* search, area::EventAccess* event);
     EvalSuccess EvaluateExitRequirement(search::Search* search, entrance::Entrance* exit);
-    EvalSuccess EvaluateDisconnectedExitRequiremrnt(search::Search* search, entrance::Entrance* exit);
+    EvalSuccess EvaluateDisconnectedExitRequirement(search::Search* search, entrance::Entrance* exit);
     EvalSuccess EvaluateLocationRequirement(search::Search* search,
                                             area::LocationAccess* locAccess);
 

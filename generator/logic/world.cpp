@@ -478,6 +478,11 @@ namespace randomizer::logic::world
                 exit->GetConnectedArea()->AddEntrance(exit);
             }
         }
+
+        // Set Twilight gates now
+        GetEntrance("Ordon Bridge -> South Faron Woods")->SetTwilightGate(true);
+        GetEntrance("Faron Field -> Kakariko Gorge")->SetTwilightGate(true);
+        GetEntrance("North Eldin Field -> Lanayru Field")->SetTwilightGate(true);
     }
 
     void World::VerifyHintData() {
@@ -1407,7 +1412,6 @@ namespace randomizer::logic::world
     }
 
     bool World::AdjustBossReturns() {
-        return Setting("Randomize Dungeon Entrances") == "On" &&
-               Setting("Randomize Boss Entrances") == "On" && Setting("Decouple Entrances") == "Off";
+        return Setting("Randomize Dungeon Entrances") == "On" && Setting("Decouple Entrances") == "Off";
     }
 } // namespace randomizer::logic::world

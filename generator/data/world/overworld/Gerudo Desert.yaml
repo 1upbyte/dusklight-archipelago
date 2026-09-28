@@ -5,6 +5,7 @@
   Map Sector: Desert Province
   Region: South Gerudo Desert
   Can Warp: True
+  Can Change Time: True
   Locations:
     Gerudo Desert Peahat Ledge Chest: Clawshot
     Gerudo Desert East Canyon Chest: Nothing
@@ -33,6 +34,7 @@
   Map Sector: Desert Province
   Region: South Gerudo Desert
   Can Warp: True
+  Can Change Time: True
   Locations:
     Gerudo Desert Warp Portal: Can_Defeat_Shadow_Beast
     Gerudo Desert Poe Above Cave of Ordeals: Can_Use_Senses and Night
@@ -44,6 +46,7 @@
   Map Sector: Desert Province
   Region: North Gerudo Desert
   Can Warp: True
+  Can Change Time: True
   Locations:
     Gerudo Desert Northeast Chest Behind Gates: Can_Defeat_Bulblin and Can_Ride_Boars
     Gerudo Desert Campfire North Chest: Nothing
@@ -60,6 +63,7 @@
   Map Sector: Desert Province
   Region: North Gerudo Desert
   Can Warp: True
+  Can Change Time: True
   Locations:
     Gerudo Desert North Peahat Poe: Night and Can_Defeat_Poe
   Exits:
@@ -82,6 +86,7 @@
   Map Sector: Desert Province
   Region: North Gerudo Desert
   Can Warp: True
+  Can Change Time: True
   Locations:
     Gerudo Desert North Small Chest Before Bulblin Camp: Nothing
     Outside Bulblin Camp Poe: Night and Can_Defeat_Poe
@@ -96,6 +101,7 @@
   Map Sector: Desert Province
   Region: Bulblin Camp
   Can Warp: True
+  Can Change Time: True
   Locations:
     Bulblin Camp First Chest Under Tower At Entrance: Nothing
     Bulblin Camp Small Chest in Back of Camp: Nothing
@@ -111,6 +117,7 @@
   Map Sector: Desert Province
   Region: Bulblin Camp
   Can Warp: True
+  Can Change Time: True
   Locations:
     Outside Arbiters Grounds Lantern Chest: Can_Light_Torches
     Outside Arbiters Grounds Poe: Night and Can_Defeat_Poe
@@ -124,6 +131,7 @@
   Map Sector: Desert Province
   Region: None
   Can Warp: True
+  Can Change Time: True
   Exits:
     Mirror Chamber Upper: Nothing
     Arbiters Grounds Boss Room: Mirror_Chamber_Access == Open or (Mirror_Chamber_Access == Barrier and 'Can_Complete_Arbiters_Grounds')
@@ -132,6 +140,7 @@
   Map Sector: Desert Province
   Region: Mirror Chamber
   Can Warp: True
+  Can Change Time: True
   Locations:
     Mirror Chamber Warp Portal: Can_Defeat_Shadow_Beast
   Exits:

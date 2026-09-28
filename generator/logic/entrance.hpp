@@ -106,6 +106,8 @@ namespace randomizer::logic::entrance
         const requirement::Requirement& GetRequirement();
         void SetComputedRequirement(const requirement::Requirement& computedRequirement);
         requirement::Requirement GetComputedRequirement();
+        void SetTwilightGate(bool gate) {_twilightGate = gate;}
+        bool IsTwilightGate() const {return _twilightGate;}
         world::World* GetWorld() const;
         bool CanStartAt() const;
         void SetShuffled(const bool& shuffled);
@@ -120,7 +122,7 @@ namespace randomizer::logic::entrance
         bool IsTarget() const;
 
         void SetReplaces(Entrance* replaces);
-        Entrance* GetReplaces() const;
+        Entrance* GetReplaces(bool vanillaIfNotShuffled = false);
         void SetReverse(Entrance* reverse);
         Entrance* GetReverse() const;
         Entrance* GetAssumed() const;
@@ -205,6 +207,8 @@ namespace randomizer::logic::entrance
          * world graph.
          */
         requirement::Requirement _computedRequirement;
+
+        bool _twilightGate = false;
 
         // Variables used for entrance shuffling
         bool _canStartAt = false;

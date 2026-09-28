@@ -9,7 +9,7 @@ game: Twilight Princess (Dusklight)
 # Needs the apworld from the same release (or newer).
 requires:
   game:
-    Twilight Princess (Dusklight): 1.7.0
+    Twilight Princess (Dusklight): 1.8.0
 
 Twilight Princess (Dusklight):
   skip_prologue: false

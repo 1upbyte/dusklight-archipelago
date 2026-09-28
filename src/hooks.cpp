@@ -16,7 +16,9 @@
 #include <mods/svc/log.hpp>
 #include <mods/items.h>
 
-#include "Z2AudioLib/Z2SceneMgr.h"
+#include "Z2AudioLib/Z2Param.h"
+#include "Z2AudioLib/Z2SeqMgr.h"
+#include "Z2AudioLib/Z2SoundMgr.h"
 #include "c/c_damagereaction.h"
 #include "d/actor/d_a_alink.h"
 #include "d/actor/d_a_b_bq.h"
@@ -69,6 +71,7 @@ DEFINE_HOOK(&dFile_select_c::dataSelect, dFile_select_c__dataSelect);
 DEFINE_HOOK(&dFile_info_c::setSaveData, dFile_info_c__setSaveData);
 
 DEFINE_HOOK(&Z2SceneMgr::setSceneName, Z2SceneMgr__setSceneName);
+DEFINE_HOOK(&Z2SeqMgr::resetBattleBgmParams, Z2SeqMgr__resetBattleBgmParams);
 
 DEFINE_HOOK(&dSv_event_c::isEventBit, dSv_event_c__isEventBit);
 DEFINE_HOOK(&dSv_event_c::onEventBit, dSv_event_c__onEventBit);
@@ -307,6 +310,8 @@ void hookPostSetSaveData(ModContext* ctx, void* args, void* retval, void* userda
     }
 }
 
+std::string prevStage{};
+s32 prevRoom{};
 bool isInZ2SceneMgrSetSceneName = false;
 HookAction hookPreZ2SceneMgrSetSceneName(ModContext*, void* args, void* retval, void* userdata) {
     isInZ2SceneMgrSetSceneName = true;
@@ -315,6 +320,27 @@ HookAction hookPreZ2SceneMgrSetSceneName(ModContext*, void* args, void* retval, 
 
 void hookPostZ2SceneMgrSetSceneName(ModContext*, void* args, void* retval, void* userdata) {
     isInZ2SceneMgrSetSceneName = false;
+    prevStage = mods::arg<char*>(args, 1);
+    prevRoom = mods::arg<s32>(args, 2);
+}
+
+// The game mutes the bgm when entering the last room in forest temple before the boss door.
+// It puts the responsibility of unmuting the bgm on the forest temple boss room. If
+// we came from the last room of forest temple, and aren't entering a scene which
+// will unmute the audio on its own, we have to manually unmute the audio.
+HookAction hookPreZ2SeqMgrResetBattleBgmParams(ModContext*, void* args, void* retval, void* userdata) {
+    auto seqMgr = mods::arg<Z2SeqMgr*>(args, 0);
+
+    std::string curStage = dComIfGp_getStartStageName();
+
+    bool previouslyInMutedRoom = prevStage == "D_MN05" && prevRoom == 12;
+    bool nextRoomWillUnmute = curStage.starts_with("D_MN05");
+
+    if (previouslyInMutedRoom && !nextRoomWillUnmute && isInZ2SceneMgrSetSceneName) {
+        seqMgr->unMuteSceneBgm(Z2Param::SCENE_CHANGE_BGM_FADEOUT_TIME);
+    }
+
+    return HOOK_CONTINUE;
 }
 
 HookAction hookPreIsEventBit(ModContext*, void* args, void* retval, void*) {
@@ -3478,6 +3504,7 @@ ModResult initialize() {
 
     ADD_HOOK_PRE(Z2SceneMgr__setSceneName, hookPreZ2SceneMgrSetSceneName);
     ADD_HOOK_POST(Z2SceneMgr__setSceneName, hookPostZ2SceneMgrSetSceneName);
+    ADD_HOOK_PRE(Z2SeqMgr__resetBattleBgmParams, hookPreZ2SeqMgrResetBattleBgmParams);
 
     ADD_HOOK_PRE(dSv_event_c__isEventBit, hookPreIsEventBit);
     ADD_HOOK_PRE(dSv_event_c__onEventBit, hookPreOnEventBit);
@@ -3636,6 +3663,7 @@ ModResult uninstall() {
     mods::hook::uninstall<dFile_info_c__setSaveData>(svc_hook);
 
     mods::hook::uninstall<Z2SceneMgr__setSceneName>(svc_hook);
+    mods::hook::uninstall<Z2SeqMgr__resetBattleBgmParams>(svc_hook);
 
     mods::hook::uninstall<dSv_event_c__isEventBit>(svc_hook);
     mods::hook::uninstall<dSv_event_c__onEventBit>(svc_hook);

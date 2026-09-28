@@ -26,7 +26,8 @@ FlattenSearch::FlattenSearch(randomizer::logic::world::World* world_)
     const auto root = world->GetRootArea();
     // Start with all formtimes at the root, false for everything else
     auto formTimes = randomizer::logic::requirement::FormTime::ALL_FORM_AND_DAY_TIMES;
-    formTimes.push_back(randomizer::logic::requirement::FormTime::TWILIGHT);
+    formTimes.push_back(randomizer::logic::requirement::FormTime::TWILIGHT_WOLF);
+    formTimes.push_back(randomizer::logic::requirement::FormTime::TWILIGHT_HUMAN);
     for (const auto& area : world->GetAreaTable() | std::views::values)
     {
         for (const auto& formTime : formTimes)
@@ -96,7 +97,8 @@ void FlattenSearch::doSearch()
     // Step 2: for every location, OR all the ways to access it
 
     auto formTimes = randomizer::logic::requirement::FormTime::ALL_FORM_AND_DAY_TIMES;
-    formTimes.push_back(randomizer::logic::requirement::FormTime::TWILIGHT);
+    formTimes.push_back(randomizer::logic::requirement::FormTime::TWILIGHT_WOLF);
+    formTimes.push_back(randomizer::logic::requirement::FormTime::TWILIGHT_HUMAN);
     for (auto& [locName, accessList] : itemLocations)
     {
         auto expr = DNF::False();
@@ -180,28 +182,42 @@ void FlattenSearch::tryExits()
         }
         auto& validFormTimes = exit->GetWorld()->GetExitTimeFormCache()[exit];
         auto connectedTwilight = exit->GetConnectedArea()->GetTwilightCompletedMacroIndex() != -1;
+        bool canSpreadTwilight = exit->GetParentArea()->GetTwilightCompletedMacroIndex() == -1 ||
+            exit->GetParentArea()->GetTwilightCompletedMacroIndex() == exit->GetConnectedArea()->GetTwilightCompletedMacroIndex();
         if (connectedTwilight)
         {
-            validFormTimes |= FormTime::TWILIGHT;
+            validFormTimes |= FormTime::TWILIGHT_HUMAN;
+            validFormTimes |= FormTime::TWILIGHT_WOLF;
         }
         for (const auto& formTime : FormTime::ALL_FORM_TIMES_AND_TWILIGHT)
         {
             if (formTime & validFormTimes)
             {
+                if (!canSpreadTwilight && formTime & (FormTime::TWILIGHT_HUMAN | FormTime::TWILIGHT_WOLF)) {
+                    continue;
+                }
+
                 auto connectedArea = exit->GetConnectedArea();
                 auto& oldExpr = areaExprs[formTime][connectedArea];
                 auto newPartial = tryExitAtFormTime(exit, formTime);
 
                 // Add the twilight completed macro for access to this area if it's part of a twilight
-                if (connectedTwilight && formTime != FormTime::TWILIGHT)
+                if (connectedTwilight && !(formTime & (FormTime::TWILIGHT_HUMAN | FormTime::TWILIGHT_WOLF)))
                 {
-                    auto& oldExprTwilight = areaExprs[FormTime::TWILIGHT][connectedArea];
+                    int twilightToSpread{};
+                    if (formTime & FormTime::WOLF || exit->IsTwilightGate()) {
+                        twilightToSpread = FormTime::TWILIGHT_WOLF;
+                    }
+                    else if (formTime & FormTime::HUMAN) {
+                        twilightToSpread = FormTime::TWILIGHT_HUMAN;
+                    }
+                    auto& oldExprTwilight = areaExprs[twilightToSpread][connectedArea];
                     auto [useful, newExpr] = oldExprTwilight.or_useful(newPartial);
                     if (useful)
                     {
                         newlyUpdatedAreas.insert(connectedArea);
                         newThingsFound = true;
-                        areaExprs[FormTime::TWILIGHT][connectedArea] = newExpr.dedup();
+                        areaExprs[twilightToSpread][connectedArea] = newExpr.dedup();
                         for (auto& event : connectedArea->GetEvents())
                         {
                             eventsToTry.insert(event);
@@ -480,8 +496,11 @@ DNF evaluatePartialRequirement(BitIndex& bitIndex,
         case randomizer::logic::requirement::Type::WOLF_LINK:
             return (formTime & randomizer::logic::requirement::FormTime::WOLF) ? DNF::True() : DNF::False();
 
-        case randomizer::logic::requirement::Type::TWILIGHT:
-            return (formTime & randomizer::logic::requirement::FormTime::TWILIGHT) ? DNF::True() : DNF::False();
+        case randomizer::logic::requirement::Type::TWILIGHT_HUMAN:
+            return (formTime & randomizer::logic::requirement::FormTime::TWILIGHT_HUMAN) ? DNF::True() : DNF::False();
+
+        case randomizer::logic::requirement::Type::TWILIGHT_WOLF:
+            return (formTime & randomizer::logic::requirement::FormTime::TWILIGHT_WOLF) ? DNF::True() : DNF::False();
 
         case randomizer::logic::requirement::Type::INVALID:
         default:

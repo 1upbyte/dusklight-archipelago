@@ -17,12 +17,19 @@ from worlds.AutoWorld import WebWorld, World
 from worlds.LauncherComponents import Component, Type, components
 
 from . import data, logic
-from .logic import FORM_NAMES, FORM_TIMES, HUMAN_DAY, HUMAN_NIGHT, TWILIGHT, WOLF_DAY, WOLF_NIGHT
+from .logic import (FORM_NAMES, FORM_TIMES, HUMAN, HUMAN_DAY, HUMAN_NIGHT, TWILIGHT_HUMAN,
+                    TWILIGHT_WOLF, TWILIGHTS, WOLF, WOLF_DAY, WOLF_NIGHT)
 from .options import TPOptions, resolve_settings
 from .pools import (JUNK_POOL, build_item_pool, in_dungeon, is_vanilla_location,
                     removed_by_nonprogress, should_remove_location, starting_items, vanilla_item)
 
 GAME = "Twilight Princess (Dusklight)"
+# Exits Midna pulls Link across as a wolf, whatever form he arrives in (world.cpp, SetTwilightGate).
+TWILIGHT_GATES = frozenset({
+    "Ordon Bridge -> South Faron Woods",
+    "Faron Field -> Kakariko Gorge",
+    "North Eldin Field -> Lanayru Field",
+})
 AP_ITEM_NAME = "Archipelago Item"
 SLOT_DATA_VERSION = 1
 
@@ -159,7 +166,7 @@ class TPWorld(World):
             hubs[a.name] = hub
             mw.regions.append(hub)
             cs: dict[int, Region] = {}
-            forms = FORM_TIMES + ((TWILIGHT,) if twilight_active(a) else ())
+            forms = FORM_TIMES + (TWILIGHTS if twilight_active(a) else ())
             for ft in forms:
                 r = Region(f"{a.name} ({FORM_NAMES[ft]})", p, mw)
                 mw.regions.append(r)
@@ -197,7 +204,7 @@ class TPWorld(World):
             return logic.AreaForms(
                 human=reach(HUMAN_DAY, HUMAN_NIGHT), wolf=reach(WOLF_DAY, WOLF_NIGHT),
                 day=reach(HUMAN_DAY, WOLF_DAY), night=reach(HUMAN_NIGHT, WOLF_NIGHT),
-                twilight=reach(TWILIGHT))
+                twilight_wolf=reach(TWILIGHT_WOLF), twilight_human=reach(TWILIGHT_HUMAN))
 
         def connect(src: Region, dst: Region, rule: logic.Rule, name: str) -> None:
             if rule is False:
@@ -223,6 +230,12 @@ class TPWorld(World):
                 for x, y in ((HUMAN_DAY, WOLF_DAY), (HUMAN_NIGHT, WOLF_NIGHT)):
                     connect(cs[x], cs[y], sc, f"{a.name}: {FORM_NAMES[x]} -> {FORM_NAMES[y]}")
                     connect(cs[y], cs[x], sc, f"{a.name}: {FORM_NAMES[y]} -> {FORM_NAMES[x]}")
+                if TWILIGHT_WOLF in cs:
+                    # ExpandFormTimes in an uncleared twilight: with the Shadow Crystal, being
+                    # there in either form means being there in both.
+                    has_sc = lambda state: state.has(shadow_crystal, self.player)
+                    connect(cs[TWILIGHT_WOLF], cs[TWILIGHT_HUMAN], has_sc, f"{a.name}: Twilight Wolf -> Human")
+                    connect(cs[TWILIGHT_HUMAN], cs[TWILIGHT_WOLF], has_sc, f"{a.name}: Twilight Human -> Wolf")
 
             for dest_name, req in a.exits.items():
                 dest = areas[dest_name]
@@ -232,15 +245,30 @@ class TPWorld(World):
                 for ft in FORM_TIMES:
                     rule = comp.all_of([dclr, comp.compile(node, ft)])
                     connect(cs[ft], dcs[ft], rule, f"{a.name} -> {dest_name} ({FORM_NAMES[ft]})")
-                if TWILIGHT in dcs:
+                if TWILIGHT_WOLF in dcs:
                     # EvaluateExitRequirement: while the destination's twilight is uncleared,
-                    # success at *any* of the parent's form-times (or at Twilight itself,
-                    # which is always added) spreads only the Twilight bit.
+                    # only twilight spreads, as the form the requirement passed in: wolf (or
+                    # through one of the gates Midna pulls Link across) as Twilight Wolf,
+                    # human as Twilight Human. The search retries exits, so a human pass
+                    # through a gate ends up spreading both.
+                    gate = f"{a.name} -> {dest_name}" in TWILIGHT_GATES
                     for ft in FORM_TIMES:
-                        connect(cs[ft], dcs[TWILIGHT], comp.compile(node, ft),
-                                f"{a.name} -> {dest_name} ({FORM_NAMES[ft]} into Twilight)")
-                    connect(hubs[a.name], dcs[TWILIGHT], comp.compile(node, TWILIGHT),
-                            f"{a.name} -> {dest_name} (Twilight)")
+                        rule = comp.compile(node, ft)
+                        targets = ((TWILIGHT_WOLF,) if ft & WOLF else (TWILIGHT_HUMAN,)) + (
+                            (TWILIGHT_WOLF,) if gate and ft & HUMAN else ())
+                        for tw in targets:
+                            connect(cs[ft], dcs[tw], rule,
+                                    f"{a.name} -> {dest_name} ({FORM_NAMES[ft]} into {FORM_NAMES[tw]})")
+                    # The parent's twilight form-times are tried too, but only from outside any
+                    # twilight, from a cleared one, or within the same twilight.
+                    allowed = (True if not twilight_active(a) or a.twilight == dest.twilight
+                               else cleared(a))
+                    for tw in TWILIGHTS:
+                        rule = comp.all_of([allowed, comp.compile(node, tw)])
+                        targets = (tw,) + ((TWILIGHT_WOLF,) if gate and tw == TWILIGHT_HUMAN else ())
+                        for to in targets:
+                            connect(hubs[a.name], dcs[to], rule,
+                                    f"{a.name} -> {dest_name} ({FORM_NAMES[tw]} into {FORM_NAMES[to]})")
 
         # Location and event access lists (a location/event may be reachable from several areas)
         loc_access: dict[str, list[tuple[data.AreaData, str]]] = {}

@@ -21,7 +21,7 @@ namespace randomizer::logic::spoiler_log
         return location->GetName() + ": " + spaces + location->GetCurrentItem()->GetName();
     }
 
-    std::string SpoilerFormatEntrance(const entrance::Entrance* entrance, const size_t& longestNameLength)
+    std::string SpoilerFormatEntrance(entrance::Entrance* entrance, const size_t& longestNameLength)
     {
         const auto numSpaces = longestNameLength - entrance->GetAlias().length();
         const std::string spaces(numSpaces, ' ');

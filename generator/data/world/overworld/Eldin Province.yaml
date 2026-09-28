@@ -6,6 +6,7 @@
   Region: Kakariko Gorge
   Twilight: Eldin
   Can Warp: True
+  Can Change Time: True
   Locations:
     Kakariko Gorge Warp Portal: Nothing
     Kakariko Gorge Owl Statue Chest: Restored_Dominion_Rod
@@ -30,6 +31,7 @@
   Region: Kakariko Gorge
   Twilight: Eldin
   Can Warp: True
+  Can Change Time: True
   Exits:
     Kakariko Gorge: Can_Smash
     Eldin Lantern Cave: Nothing
@@ -50,9 +52,10 @@
 - Name: Kakariko Gorge Behind Gate
   Region: Kakariko Gorge
   Twilight: Eldin
+  Can Change Time: True
   Exits:
     Lower Kakariko Village: Nothing
-    Kakariko Gorge: Wolf_Link or Gate_Keys or Small_Keys == Keysy or Twilight
+    Kakariko Gorge: Wolf_Link or Gate_Keys or Small_Keys == Keysy or Twilight_Wolf
 
 # KAKARIKO VILLAGE & GRAVEYARD
 
@@ -63,6 +66,7 @@
   Can Warp: True
   Events:
     Can Start Springwater Rush: Can_Talk_to_Springwater_Goron
+    Can Start Eldin Twilight: Twilight_Wolf or (Sword and Twilight_Human)
   Locations:
     Kakariko Village Warp Portal: Nothing
     Eldin Spring Underwater Chest: Can_Smash and Iron_Boots
@@ -79,15 +83,17 @@
     Renados Sanctuary Front East Door Exterior: Nothing
     Renados Sanctuary Back West Door Exterior: Nothing
     Renados Sanctuary Back East Door Exterior: Nothing
-    Kakariko Renados Sanctuary: Twilight
+    Kakariko Renados Sanctuary: Twilight_Wolf
     Kakariko Graveyard: Nothing
-    Kakariko Malo Mart: Twilight or (Can_Open_Doors and Day)
+    Kakariko Malo Mart: Can_Open_Doors and Day
+    Kakariko Malo Mart Twilight Entrance: Twilight_Wolf
     Elde Inn North Door Exterior: Nothing
     Elde Inn South Door Exterior: Nothing
-    Kakariko Elde Inn: Twilight
+    Kakariko Elde Inn: Twilight_Wolf
     Kakariko Bug House Door: Nothing
     Kakariko Bug House Ceiling Hole: Nothing
-    Kakariko Barnes Bomb Shop Lower: Twilight or (Can_Open_Doors and Day)
+    Kakariko Barnes Bomb Shop Lower: Can_Open_Doors and Day
+    Kakariko Barnes Bomb Shop Twilight Entrance: Twilight_Wolf
     Upper Kakariko Village: Can_Smash or ('Can_Complete_Goron_Mines' and Day)
     Death Mountain Near Kakariko: Nothing
     Kakariko Village Behind Gate: Not_Twilight
@@ -153,13 +159,14 @@
   Twilight: Eldin
   Can Transform: If Transform Anywhere
   Events:
+    Can Move Statue in Twilight: Twilight_Wolf
     Can Show Ilia Wooden Statue: Wooden_Statue
     Can Show Ilia Ilias Charm: Ilias_Charm
   Locations:
     Renados Letter: "'Can_Complete_Temple_of_Time'"
     Ilia Memory Reward: "'Can_Show_Ilia_Ilias_Charm'"
   Exits:
-    Kakariko Renados Sanctuary Basement: Nothing
+    Kakariko Renados Sanctuary Basement: Not_Twilight or 'Can_Move_Statue_in_Twilight'
     Renados Sanctuary Front East Door Interior: Nothing
     Renados Sanctuary Front West Door Interior: Nothing
     Renados Sanctuary Back East Door Interior: Nothing
@@ -221,6 +228,12 @@
   Exits:
     Lower Kakariko Village: Nothing
 
+- Name: Kakariko Malo Mart Twilight Entrance
+  Twilight: Eldin
+  Can Transform: Never
+  Exits:
+    Kakariko Malo Mart: Twilight_Wolf
+
 - Name: Elde Inn North Door Exterior
   Twilight: Eldin
   Can Transform: Never
@@ -280,7 +293,7 @@
     Kakariko Bug House Twilit Insect: Can_Defeat_Eldin_Twilit_Insect
   Exits:
     Kakariko Bug House Door: Can_Open_Doors
-    Kakariko Bug House Ceiling Hole: Can_Midna_Jump or Twilight
+    Kakariko Bug House Ceiling Hole: Can_Midna_Jump or Twilight_Wolf
 
 - Name: Kakariko Barnes Bomb Shop Lower
   Twilight: Eldin
@@ -292,6 +305,12 @@
   Exits:
     Kakariko Barnes Bomb Shop Upper: Nothing
     Lower Kakariko Village: Can_Open_Doors
+
+- Name: Kakariko Barnes Bomb Shop Twilight Entrance
+  Twilight: Eldin
+  Can Transform: Never
+  Exits:
+    Kakariko Barnes Bomb Shop Lower: Twilight_Wolf
 
 - Name: Kakariko Barnes Bomb Shop Upper
   Twilight: Eldin
@@ -331,7 +350,7 @@
   Twilight: Eldin
   Can Transform: Never
   Exits:
-    Kakariko Watchtower Lower Interior: Can_Dig or Twilight
+    Kakariko Watchtower Lower Interior: Can_Dig or Twilight_Wolf
     Upper Kakariko Village: Nothing
 
 - Name: Kakariko Watchtower Lower Interior
@@ -341,7 +360,7 @@
   Exits:
     Kakariko Watchtower Upper Interior: Can_Climb_Ladders
     Kakariko Watchtower Lower Door: Can_Open_Doors
-    Kakariko Watchtower Dig Spot: Can_Dig or Twilight
+    Kakariko Watchtower Dig Spot: Can_Dig or Twilight_Wolf
 
 - Name: Kakariko Watchtower Upper Interior
   Twilight: Eldin
@@ -379,8 +398,9 @@
   Region: Death Mountain
   Twilight: Eldin
   Can Warp: True
+  Can Change Time: True
   Exits:
-    Death Mountain Trail: Iron_Boots or 'Can_Complete_Goron_Mines' or Twilight
+    Death Mountain Trail: Iron_Boots or 'Can_Complete_Goron_Mines' or Twilight_Wolf
     Lower Kakariko Village: Nothing
 
 - Name: Death Mountain Trail
@@ -388,6 +408,7 @@
   Region: Death Mountain
   Twilight: Eldin
   Can Warp: True
+  Can Change Time: True
   Events:
     Howl at Death Mountain Howling Stone: Can_Howl
   Locations:
@@ -403,12 +424,13 @@
   Region: Death Mountain
   Twilight: Eldin
   Can Warp: True
+  Can Change Time: True
   Locations:
     Death Mountain Warp Portal: Nothing
     Death Mountain Volcano Pipe Ledge Rock Rupee: Can_Complete_Eldin_Twilight and (Can_Defeat_Goron or 'Can_Complete_Goron_Mines')
     Death Mountain Trail Twilit Insect on Wall: Can_Defeat_Eldin_Twilit_Insect
   Exits:
-    Death Mountain Hot Spring: Twilight or (Can_Defeat_Goron or 'Can_Complete_Goron_Mines')
+    Death Mountain Hot Spring: Twilight_Wolf or (Can_Defeat_Goron or 'Can_Complete_Goron_Mines')
     Death Mountain Lower Elevator: Goron_Mines_Entrance == Open or 'Can_Access_Death_Mountain_Lower_Elevator'
     Death Mountain Outside Sumo Hall: Iron_Boots and (Can_Defeat_Goron or 'Can_Complete_Goron_Mines') and Can_Complete_Eldin_Twilight
     Death Mountain Trail: Nothing
@@ -418,6 +440,7 @@
   Region: Death Mountain
   Twilight: Eldin
   Can Warp: True
+  Can Change Time: True
   Events:
     Can Buy Wooden Shield: Can_Talk_to_Humans and 'Can_Farm_Rupees' and (Can_Defeat_Goron or 'Can_Complete_Goron_Mines')
   Locations:
@@ -430,6 +453,7 @@
   Region: Death Mountain
   Twilight: Eldin
   Can Warp: True
+  Can Change Time: True
   Exits:
     Death Mountain Sumo Hall Elevator: Iron_Boots
     Death Mountain Volcano: Nothing
@@ -478,6 +502,7 @@
   Region: Eldin Field
   Twilight: Eldin
   Can Warp: True
+  Can Change Time: True
   Events:
     Can Finish Goron Springwater Rush: "'Can_Start_Springwater_Rush' and (Skip_Bridge_Donation == On or 'Can_Fund_Malo_Mart')"
   Locations:
@@ -503,6 +528,7 @@
   Region: Eldin Field
   Twilight: Eldin
   Can Warp: True
+  Can Change Time: True
   Exits:
     Outside Castle Town East: Nothing
     Eldin Field: Skip_Bridge_Donation == On or 'Can_Fund_Malo_Mart'
@@ -527,6 +553,7 @@
   Region: North Eldin
   Twilight: Eldin
   Can Warp: True
+  Can Change Time: True
   Locations:
     Bridge of Eldin Boulder Rupee: Can_Smash
     Bridge of Eldin Owl Statue Sky Character: Restored_Dominion_Rod
@@ -573,12 +600,13 @@
   Region: North Eldin
   Twilight: Eldin
   Can Warp: True
+  Can Change Time: True
   Locations:
     North Eldin Field Hint Sign: Nothing
   Exits:
     Eldin Field Grotto Platform: Spinner
     Eldin Field Outside Hidden Village: Ilia_Memory_Quest >= Charm or 'Can_Show_Ilia_Wooden_Statue'
-    Lanayru Field: Nothing
+    Lanayru Field: Not_Twilight
     Eldin Field North of Bridge: Can_Smash
 
 - Name: Eldin Field Grotto Platform
@@ -586,6 +614,7 @@
   Region: North Eldin
   Twilight: Eldin
   Can Warp: True
+  Can Change Time: True
   Exits:
     Eldin Field Stalfos Grotto: Can_Dig
     North Eldin Field: Spinner # TODO: Check Savewarp
@@ -603,6 +632,7 @@
   Region: North Eldin
   Twilight: Eldin
   Can Warp: True
+  Can Change Time: True
   Exits:
     Hidden Village: Nothing
     North Eldin Field: "'Can_Show_Ilia_Wooden_Statue'"
