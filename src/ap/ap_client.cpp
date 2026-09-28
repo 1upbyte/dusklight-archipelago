@@ -291,7 +291,10 @@ void Client::handle(const json& p) {
             }
             int skipped = 0;
             auto& in = s_itemNames[game];
-            for (const auto& [name, id] : gd.value("item_name_to_id", json::object()).items()) {
+            // Named, not iterated in place: items() of a temporary dangles before C++23's
+            // range-for lifetime rules (it read freed memory as null on Linux builds).
+            const json itemIds = gd.value("item_name_to_id", json::object());
+            for (const auto& [name, id] : itemIds.items()) {
                 if (id.is_number_integer()) {
                     in[id.get<int64_t>()] = name;
                 } else {
@@ -299,7 +302,8 @@ void Client::handle(const json& p) {
                 }
             }
             auto& ln = s_locationNames[game];
-            for (const auto& [name, id] : gd.value("location_name_to_id", json::object()).items()) {
+            const json locationIds = gd.value("location_name_to_id", json::object());
+            for (const auto& [name, id] : locationIds.items()) {
                 if (id.is_number_integer()) {
                     ln[id.get<int64_t>()] = name;
                 } else {

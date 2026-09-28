@@ -535,7 +535,10 @@ bool load_slot_data(const json& slotData, std::string& err) {
     }
     g_locationIds.clear();
     g_apItemText.clear();
-    for (const auto& [name, id] : slotData.value("location_ids", json::object()).items()) {
+    // Each value() is named before iterating: items() of a temporary dangles before C++23's
+    // range-for lifetime rules, which Linux builds read as nulls (issue #2).
+    const json locationIds = slotData.value("location_ids", json::object());
+    for (const auto& [name, id] : locationIds.items()) {
         // Strict: a location we can't report would silently never send its item.
         if (!id.is_number_integer()) {
             err = fmt::format("This room's data for your slot is broken (location '{}' has no id). "
@@ -549,7 +552,8 @@ bool load_slot_data(const json& slotData, std::string& err) {
     g_expected.clear();
     g_placementOwner.clear();
     g_placementFlags.clear();
-    for (const auto& [loc, v] : slotData.value("placements", json::object()).items()) {
+    const json placements = slotData.value("placements", json::object());
+    for (const auto& [loc, v] : placements.items()) {
         if (v.is_object()) {
             g_placementOwner[loc] = v.value("player", "");
             g_placementFlags[loc] = json_num(v, "flags", 1);
@@ -617,14 +621,16 @@ bool generate_seed(const json& slotData, const std::string& slot, std::string& o
         settings["Starting Inventory"] = YAML::Node(YAML::NodeType::Map);
         settings["Excluded Locations"] = YAML::Node(YAML::NodeType::Sequence);
         settings["Mixed Entrance Pools"] = YAML::Node(YAML::NodeType::Sequence);
-        for (const auto& [k, v] : slotData.value("settings", json::object()).items()) {
+        const json slotSettings = slotData.value("settings", json::object());
+        for (const auto& [k, v] : slotSettings.items()) {
             settings[k] = v.get<std::string>();
         }
         std::ofstream(base / "settings.yaml") << YAML::Dump(settings);
 
         YAML::Node plando;
         YAML::Node locs(YAML::NodeType::Map);
-        for (const auto& [loc, v] : slotData.value("placements", json::object()).items()) {
+        const json placements = slotData.value("placements", json::object());
+        for (const auto& [loc, v] : placements.items()) {
             locs[loc] = v.is_string() ? v.get<std::string>() : v.value("item", "Archipelago Item");
         }
         plando["World 1"]["Locations"] = locs;
