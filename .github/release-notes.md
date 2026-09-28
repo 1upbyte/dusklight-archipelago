@@ -11,13 +11,14 @@ Then in Dusklight: use the arrows on the Play button to pick **Archipelago**, st
 
 Needs Dusklight 2.0.1 or newer. This mod carries its own copy of the randomizer, so Dusklight's built-in Randomizer doesn't need updating or removing; the two don't interfere.
 
-## What's new in 1.4.0
+## What's new in 1.5.0
 
-- **Game boxes.** Other players' items can show as the box of the game they're for, with its cover art, instead of a Sol: on the ground, in Link's hands and in the item text box. Covers come from SteamGridDB with your own free API key; the first time you play, the mod asks whether you want boxes (and takes the key) or Sols. Change it any time under **Other players' items** on the Status page of the Archipelago tab (F1). Covers download once per game and are kept for every room after that.
-- Other players' items (boxes and Sols) are drawn at half their old size.
+- **Item jingles match the item.** Picking up another player's item plays the fanfare for how important it is to them: the full item-get fanfare for progression, the smaller jingle for useful items, the quick one for filler, and the save menu's "No" sound for traps.
+- **Fixed:** after finding another player's item, the next item text box could show that game's cover instead of its own icon.
+- **Connecting is sturdier.** Bad data from a room no longer leaves the game stuck on "connecting…": harmless gaps are skipped, and anything that would break the seed is shown as an error in the connection window.
 - The apworld is unchanged (1.7.0).
 
-New in 1.3.0: hints tab, emoji, and the optional on-screen overlay.
+New in 1.4.0: game boxes. Other players' items can show as their game's box with its cover art (SteamGridDB, your own free API key).
 
 ## Updating
 

@@ -123,6 +123,10 @@ the ones that only exist inside Archipelago) stay Sols, as does everything when 
 To use your own art for a game, put a PNG or JPG named after the game (as the room lists it) in
 `randomizer/archipelago/covers/custom`.
 
+Picking up another player's item plays a jingle for how important it is to them, going by
+Archipelago's item classification: the full item-get fanfare for progression, the heart-piece
+jingle for useful items, the rupee jingle for filler, and the save menu's "No" sound for traps.
+
 ## Presets
 
 `presets/` holds seven ready-made YAMLs, each verified to generate and to rebuild exactly in

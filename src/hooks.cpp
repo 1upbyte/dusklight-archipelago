@@ -1853,6 +1853,19 @@ HookAction hookPreSetGetSubBgm(ModContext*, void* args, void*, void*) {
     const int i_itemNo = mods::arg<int>(args, 1);
     u32 se_type = getSeTypeRandomizer[i_itemNo];
 
+    // Another world's item: the jingle follows its Archipelago classification. Traps have no
+    // jingle of their own in the game, so they get the save menu's "Continue? No" sound.
+    if (i_itemNo == dItemNo_Randomizer_NOENTRY_220_e) {
+        switch (ap::ap_item_importance()) {
+        case ap::ItemImportance::Progression: se_type = SETYPE_ITEM_GET; break;
+        case ap::ItemImportance::Useful: se_type = SETYPE_ITEM_GET_MINI; break;
+        case ap::ItemImportance::Filler: se_type = SETYPE_ITEM_GET_ME; break;
+        case ap::ItemImportance::Trap:
+            mDoAud_seStart(Z2SE_QUIT_GAME, NULL, 0, 0);
+            return HOOK_SKIP_ORIGINAL;
+        }
+    }
+
     if (se_type == SETYPE_ITEM_GET_ME && i_this->mProcVar4.field_0x3010 == 0) {
         se_type = SETYPE_ITEM_GET_ME_S;
     }

@@ -121,6 +121,8 @@ std::unordered_map<std::string, int64_t> g_locationIds;       // location name -
 std::unordered_map<std::string, std::string> g_apItemText;    // location name -> get text
 // Other worlds' items in this world: location -> the slot that owns it (for its game's box).
 std::unordered_map<std::string, std::string> g_placementOwner;
+// ... and its Archipelago classification (1 progression, 2 useful, 4 trap; 0 filler).
+std::unordered_map<std::string, int> g_placementFlags;
 // Item actors that resolved to an AP item -> their location (from the check resolver).
 std::unordered_map<const void*, std::string> g_actorLocation;
 // The item Link is holding up: its demo actor carries the pickup's committed result, which
@@ -534,13 +536,23 @@ bool load_slot_data(const json& slotData, std::string& err) {
     g_locationIds.clear();
     g_apItemText.clear();
     for (const auto& [name, id] : slotData.value("location_ids", json::object()).items()) {
+        // Strict: a location we can't report would silently never send its item.
+        if (!id.is_number_integer()) {
+            err = fmt::format("This room's data for your slot is broken (location '{}' has no id). "
+                              "Regenerate the multiworld with the apworld from the same release "
+                              "as the mod.", message_safe(name, 80));
+            ap_log("slot data: location without an id: " + name);
+            return false;
+        }
         g_locationIds[name] = id.get<int64_t>();
     }
     g_expected.clear();
     g_placementOwner.clear();
+    g_placementFlags.clear();
     for (const auto& [loc, v] : slotData.value("placements", json::object()).items()) {
         if (v.is_object()) {
             g_placementOwner[loc] = v.value("player", "");
+            g_placementFlags[loc] = json_num(v, "flags", 1);
         }
         g_expected[loc] = v.is_object() ? fmt::format("{} ({})", v.value("name", "?"),
                                               v.value("player", "?"))
@@ -697,7 +709,9 @@ void on_connected(const json& p) {
     want_covers();
     g_checked.clear();
     for (const auto& id : p.value("checked_locations", json::array())) {
-        g_checked.insert(id.get<int64_t>());
+        if (id.is_number_integer()) {
+            g_checked.insert(id.get<int64_t>());
+        }
     }
     g_reachInputs = SIZE_MAX;
     ++g_trackerVersion;
@@ -767,16 +781,16 @@ void on_print(const std::string& text, const json& msg) {
     const std::string type = msg.value("type", "");
     const int me = g_client.slot();
     if (type == "Hint" && !msg.value("found", false)) {
-        const int receiver = msg.value("receiving", -1);
-        const int finder = msg.contains("item") ? msg["item"].value("player", -1) : -1;
+        const int receiver = json_num(msg, "receiving", -1);
+        const int finder = msg.contains("item") ? json_num(msg["item"], "player", -1) : -1;
         if (receiver == me || finder == me) {
             toast("Hint", text, nullptr, 6000);
         }
         return;
     }
     if (type == "ItemSend" || type == "ItemCheat") {
-        const int receiver = msg.value("receiving", -1);
-        const int sender = msg.contains("item") ? msg["item"].value("player", -1) : -1;
+        const int receiver = json_num(msg, "receiving", -1);
+        const int sender = msg.contains("item") ? json_num(msg["item"], "player", -1) : -1;
         if (receiver == me || sender == me) {
             if (receiver == me && sender == me) {
                 return;  // our own item at our own location: the game already showed it
@@ -1078,7 +1092,13 @@ void post_msg_item_exec(ModContext*, void* args, void*, void*) {
         g_apTextServed = false;
         g_apTextBox = scrn;
     }
-    if (scrn->mItemIndex != kApItem && scrn != g_apTextBox) {
+    // Ours only while it still shows our (borrowed) message: boxes are reallocated at the
+    // same address, so a later box for anything else must not inherit the claim.
+    const bool ours = scrn == g_apTextBox && scrn->mItemIndex == kDonorItem;
+    if (scrn == g_apTextBox && !ours) {
+        g_apTextBox = nullptr;
+    }
+    if (scrn->mItemIndex != kApItem && !ours) {
         return;
     }
     J2DPicture* pane = scrn->mpItemPane[0];
@@ -2981,6 +3001,23 @@ ModResult open_connect_gate(void* fileSelect) {
     return open_gate_window(fileSelect);
 }
 
+ItemImportance ap_item_importance() {
+    // The pickup resolved its check just before the jingle; unknown counts as progression,
+    // the fanfare it always had.
+    const auto it = g_placementFlags.find(g_lastResolvedApLocation);
+    const int flags = it != g_placementFlags.end() ? it->second : 1;
+    if (flags & 1) {
+        return ItemImportance::Progression;
+    }
+    if (flags & 2) {
+        return ItemImportance::Useful;
+    }
+    if (flags & 4) {
+        return ItemImportance::Trap;
+    }
+    return ItemImportance::Filler;
+}
+
 void on_get_item_demo(void* link) {
     auto* alink = static_cast<daAlink_c*>(link);
     if (alink->field_0x32cc != 0) {
@@ -2989,9 +3026,10 @@ void on_get_item_demo(void* link) {
     if (alink->mProcVar2.field_0x300c != kApItem) {
         if (alink->mProcVar2.field_0x300c == dItemNo_Randomizer_FOOLISH_ITEM_e) {
             g_armedFrames = 0;  // a real Foolish Item uses the same message
-            g_apTextServed = false;
-            g_apTextBox = nullptr;
         }
+        // Any other pickup's text box is its own, even at the address ours had.
+        g_apTextServed = false;
+        g_apTextBox = nullptr;
         return;
     }
     // Always re-arm from the check being collected right now; the placeholder item has no

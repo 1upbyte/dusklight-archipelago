@@ -16,6 +16,17 @@ namespace ap {
 
 using json = nlohmann::json;
 
+// A number field from a server packet, or `fallback` when it's missing, null or not a number.
+// Only for fields where a default is harmless; anything identity-bearing is checked strictly.
+template <typename T>
+T json_num(const json& j, const char* key, T fallback) {
+    if (!j.is_object()) {
+        return fallback;
+    }
+    const auto it = j.find(key);
+    return it != j.end() && it->is_number() ? it->template get<T>() : fallback;
+}
+
 struct NetworkItem {
     int64_t item = 0;
     int64_t location = 0;

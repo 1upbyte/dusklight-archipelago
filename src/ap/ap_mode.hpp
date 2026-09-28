@@ -24,4 +24,9 @@ ModResult open_connect_gate(void* fileSelect);
 // Called by the randomizer's procCoGetItem hook: lets AP items use custom get-item text.
 void on_get_item_demo(void* link);
 
+// How important the other world's item being picked up is, from its Archipelago
+// classification, so its get-item jingle can match (see hookPreSetGetSubBgm).
+enum class ItemImportance { Progression, Useful, Filler, Trap };
+ItemImportance ap_item_importance();
+
 }  // namespace ap

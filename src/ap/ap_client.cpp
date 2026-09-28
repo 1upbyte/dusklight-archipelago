@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <memory>
 #include <random>
+#include <stdexcept>
 #include <unordered_map>
 
 namespace ap {
@@ -141,10 +142,21 @@ void Client::on_message(std::string_view text) {
         return;
     }
     for (const auto& p : packets) {
+        const std::string cmd = p.is_object() ? p.value("cmd", std::string{"?"}) : std::string{"?"};
         try {
             handle(p);
         } catch (const std::exception& e) {
-            mods::log::error("archipelago: error handling {}: {}", p.value("cmd", "?"), e.what());
+            mods::log::error("archipelago: error handling {}: {}", cmd, e.what());
+            if (cmd == "Connected" && mState != State::Refused) {
+                mLastError = std::string("couldn't read the server's reply to connecting (") +
+                             e.what() + ")";
+                mState = State::Refused;  // no automatic retry: it would fail the same way
+                mSocket.close();
+                if (onDisconnected) {
+                    onDisconnected(mLastError);
+                }
+                return;
+            }
         }
     }
 }
@@ -191,7 +203,7 @@ void Client::handle(const json& p) {
     mods::log::debug("archipelago: <- {}", cmd);
     if (cmd == "RoomInfo") {
         mSeedName = p.value("seed_name", "");
-        mHintCostPercent = p.value("hint_cost", 0);
+        mHintCostPercent = json_num(p, "hint_cost", 0);
         json games = p.value("games", json::array());
         // One frame for both: Connect first, then the names for PrintJSON.
         send(json::array({{
@@ -208,14 +220,22 @@ void Client::handle(const json& p) {
             {"slot_data", true},
         }, {{"cmd", "GetDataPackage"}, {"games", games}}}));
     } else if (cmd == "Connected") {
-        mSlot = p.value("slot", -1);
-        mTeam = p.value("team", 0);
-        mHintPoints = p.value("hint_points", 0);
+        // Who we are: without these nothing else works, so a bad value ends the connection.
+        if (!p.contains("slot") || !p["slot"].is_number_integer() || !p.contains("team") ||
+            !p["team"].is_number_integer()) {
+            throw std::runtime_error("it has no slot or team number");
+        }
+        mSlot = p["slot"].get<int>();
+        mTeam = p["team"].get<int>();
+        mHintPoints = json_num(p, "hint_points", 0);
         mSlotLocations = p.value("missing_locations", json::array()).size() +
                          p.value("checked_locations", json::array()).size();
         mPlayerNames.clear();
         for (const auto& pl : p.value("players", json::array())) {
-            const int s = pl.value("slot", 0);
+            const int s = json_num(pl, "slot", -1);
+            if (s < 0 || s > 100000) {
+                continue;
+            }
             if (s >= static_cast<int>(mPlayerNames.size())) {
                 mPlayerNames.resize(s + 1);
             }
@@ -251,21 +271,44 @@ void Client::handle(const json& p) {
     } else if (cmd == "ReceivedItems") {
         std::vector<NetworkItem> items;
         for (const auto& it : p.value("items", json::array())) {
-            items.push_back({it.value("item", int64_t{0}), it.value("location", int64_t{0}),
-                it.value("player", 0), it.value("flags", 0)});
+            // Kept even if malformed, so the item index stays in step with the server's; an
+            // item id of 0 is simply not something we can give.
+            items.push_back({json_num(it, "item", int64_t{0}), json_num(it, "location", int64_t{0}),
+                json_num(it, "player", 0), json_num(it, "flags", 0)});
         }
         if (onItems) {
-            onItems(p.value("index", 0), items);
+            onItems(json_num(p, "index", 0), items);
         }
     } else if (cmd == "DataPackage") {
-        for (const auto& [game, gd] : p["data"]["games"].items()) {
+        // Names for display only. An entry without a number (some apworlds list events this
+        // way) can never be sent or checked, so it's skipped rather than failing the table.
+        const json games = p.contains("data") && p["data"].is_object()
+                               ? p["data"].value("games", json::object())
+                               : json::object();
+        for (const auto& [game, gd] : games.items()) {
+            if (!gd.is_object()) {
+                continue;
+            }
+            int skipped = 0;
             auto& in = s_itemNames[game];
             for (const auto& [name, id] : gd.value("item_name_to_id", json::object()).items()) {
-                in[id.get<int64_t>()] = name;
+                if (id.is_number_integer()) {
+                    in[id.get<int64_t>()] = name;
+                } else {
+                    ++skipped;
+                }
             }
             auto& ln = s_locationNames[game];
             for (const auto& [name, id] : gd.value("location_name_to_id", json::object()).items()) {
-                ln[id.get<int64_t>()] = name;
+                if (id.is_number_integer()) {
+                    ln[id.get<int64_t>()] = name;
+                } else {
+                    ++skipped;
+                }
+            }
+            if (skipped > 0) {
+                mods::log::warn("archipelago: data package for '{}' has {} names without an id; "
+                                "skipped", game, skipped);
             }
         }
     } else if (cmd == "PrintJSON") {
@@ -307,14 +350,14 @@ std::vector<Hint> Client::parse_hints(const json& list) {
             continue;
         }
         Hint hint;
-        hint.receivingPlayer = h.value("receiving_player", 0);
-        hint.findingPlayer = h.value("finding_player", 0);
-        hint.location = h.value("location", int64_t{0});
-        hint.item = h.value("item", int64_t{0});
+        hint.receivingPlayer = json_num(h, "receiving_player", 0);
+        hint.findingPlayer = json_num(h, "finding_player", 0);
+        hint.location = json_num(h, "location", int64_t{0});
+        hint.item = json_num(h, "item", int64_t{0});
         hint.found = h.value("found", false);
         hint.entrance = h.value("entrance", "");
-        hint.itemFlags = h.value("item_flags", 0);
-        hint.status = h.value("status", hint.found ? 40 : 0);
+        hint.itemFlags = json_num(h, "item_flags", 0);
+        hint.status = json_num(h, "status", hint.found ? 40 : 0);
         hints.push_back(std::move(hint));
     }
     return hints;
@@ -389,7 +432,7 @@ std::string part_text(const json& part, const Client& client) {
     }
     if (type == "item_id" || type == "location_id") {
         const int64_t id = std::strtoll(text.c_str(), nullptr, 10);
-        const int owner = part.value("player", 0);
+        const int owner = json_num(part, "player", 0);
         return type == "item_id" ? client.itemName(id, owner) : client.locationName(id, owner);
     }
     return text;
@@ -438,7 +481,7 @@ std::string print_rml(const json& data, const Client& client) {
         } else if (type == "player_name") {
             cls = "ap-player";
         } else if (type == "item_id" || type == "item_name") {
-            const int flags = part.value("flags", 0);
+            const int flags = json_num(part, "flags", 0);
             cls = (flags & 1) ? "ap-prog" : (flags & 2) ? "ap-useful" : (flags & 4) ? "ap-trap" : "ap-item";
         } else if (type == "location_id" || type == "location_name") {
             cls = "ap-loc";
