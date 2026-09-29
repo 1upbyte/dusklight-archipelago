@@ -9,8 +9,7 @@ built on top of the [official Dusklight randomizer](https://github.com/TwilitRea
 
 The mod connects to an Archipelago server from inside the game and rebuilds the seed with the
 randomizer's own generator, so a multiworld seed plays exactly like a normal randomizer seed:
-same logic, same stage edits, same text, same progressive items. There is no separate client to
-run and nothing to patch.
+same logic, stage edits, text, and progressive items.
 
 ## Playing
 
