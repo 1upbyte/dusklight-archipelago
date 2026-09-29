@@ -986,6 +986,124 @@ F_SP109:
         - 12
         - 14
 
+    # Remove all hider objects from the twilight layer
+    # Otherwise, doors aren't interactable until the
+    # Kak portal is obtained which can softlock in entrance
+    # randomizer
+    - action: delete
+      name: hider
+      parameters: 0x0003FD1F
+      position:
+        x: -5837.34228515625
+        y: -603.641174316406
+        z: -7685.341796875
+      angle:
+        x: 0x0000
+        y: 0x0000
+        z: 0x0000
+      set id: 0xFFFF
+      scale:
+        x: 255
+        y: 255
+        z: 255
+      layers:
+        - 14
+
+    - action: delete
+      name: hider
+      parameters: 0x0003FD1F
+      position:
+        x: 512.244323730469
+        y: -138.641174316406
+        z: -7566.65771484375
+      angle:
+        x: 0x0000
+        y: 0x0000
+        z: 0x0000
+      set id: 0xFFFF
+      scale:
+        x: 255
+        y: 255
+        z: 255
+      layers:
+        - 14
+
+    - action: delete
+      name: hider
+      parameters: 0x0003FD1F
+      position:
+        x: 1631.9033203125
+        y: -138.641174316406
+        z: -2796.91064453125
+      angle:
+        x: 0x0000
+        y: 0x0000
+        z: 0x0000
+      set id: 0xFFFF
+      scale:
+        x: 255
+        y: 255
+        z: 150
+      layers:
+        - 14
+
+    - action: delete
+      name: hider
+      parameters: 0x0003FD1F
+      position:
+        x: -4442.97216796875
+        y: -138.641174316406
+        z: -1632.46533203125
+      angle:
+        x: 0x0000
+        y: 0x0000
+        z: 0x0000
+      set id: 0xFFFF
+      scale:
+        x: 255
+        y: 255
+        z: 255
+      layers:
+        - 14
+
+    - action: delete
+      name: hider
+      parameters: 0x0003FD1F
+      position:
+        x: -1750
+        y: -423.641174316406
+        z: 2300
+      angle:
+        x: 0x0000
+        y: 0x0000
+        z: 0x0000
+      set id: 0xFFFF
+      scale:
+        x: 200
+        y: 255
+        z: 100
+      layers:
+        - 14
+
+    - action: delete
+      name: hider
+      parameters: 0x0003FD1F
+      position:
+        x: -1139.810546875
+        y: -2084.90307617187
+        z: 13857.9287109375
+      angle:
+        x: 0x0000
+        y: 0x0000
+        z: 0x0000
+      set id: 0xFFFF
+      scale:
+        x: 255
+        y: 255
+        z: 255
+      layers:
+        - 14
+
 # Kakariko Graveyard
 F_SP111:
   # Room 0 - Main graveyard
