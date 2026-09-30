@@ -44,6 +44,7 @@
 #include "d/actor/d_a_obj_life_container.h"
 #include "d/actor/d_a_obj_master_sword.h"
 #include "d/actor/d_a_obj_swBallC.h"
+#include "d/actor/d_a_obj_wind_stone.h"
 #include "d/actor/d_a_obj_zra_rock.h"
 #include "d/actor/d_a_shop_item.h"
 #include "d/actor/d_a_tag_kmsg.h"
@@ -224,6 +225,8 @@ DEFINE_HOOK_SYMBOL("dComIfGs_getCollectSmell", u8(), getCollectSmell);
 DEFINE_HOOK(&dEvt_control_c::skipper, dEvt_control_c__skipper);
 
 DEFINE_HOOK(&daObjMasterSword_c::executeWait, daObjMasterSword_c__executeWait);
+
+DEFINE_HOOK_SYMBOL("daWindStone_c::chkEveOccur", bool(daWindStone_c*), daWindStone_c__chkEveOccur);
 
 namespace randomizer::ui {
 dialogSelectModeState g_dialogSelectModeState = SelectReady;
@@ -413,14 +416,6 @@ HookAction hookPreIsEventBit(ModContext*, void* args, void* retval, void*) {
                 out = FALSE;
                 return HOOK_SKIP_ORIGINAL;
             }
-        }
-        break;
-    }
-    case HOWLED_AT_SNOWPEAK_STONE: {
-        if (daAlink_c::checkStageName(allStages[Snowpeak])) {
-            // return false so the player can howl at the stone multiple times to remove map glitch
-            out = FALSE;
-            return HOOK_SKIP_ORIGINAL;
         }
         break;
     }
@@ -3476,6 +3471,17 @@ void hookPostMasterSwordExecuteWait(ModContext*, void* args, void* retval, void*
     }
 }
 
+// Always allow howling at the snowpeak stone
+HookAction hookPreWindStoneChkEveOccur(ModContext*, void* args, void* retval, void*) {
+    auto windStone = mods::arg<daWindStone_c*>(args, 0);
+    auto tuneId = windStone->getTuneId();
+    if (tuneId == 7 && dComIfGs_getStartPoint() != 100) {
+        *static_cast<bool*>(retval) = true;
+        return HOOK_SKIP_ORIGINAL;
+    }
+    return HOOK_CONTINUE;
+}
+
 }
 
 ModResult initialize() {
@@ -3651,6 +3657,8 @@ ModResult initialize() {
 
     ADD_HOOK_POST(daObjMasterSword_c__executeWait, hookPostMasterSwordExecuteWait);
 
+    ADD_HOOK_PRE(daWindStone_c__chkEveOccur, hookPreWindStoneChkEveOccur);
+
     return MOD_OK;
 }
 
@@ -3795,6 +3803,7 @@ ModResult uninstall() {
 
     mods::hook::uninstall<daObjMasterSword_c__executeWait>(svc_hook);
 
+    mods::hook::uninstall<daWindStone_c__chkEveOccur>(svc_hook);
     return MOD_OK;
 }
 }

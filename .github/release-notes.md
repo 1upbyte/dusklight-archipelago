@@ -11,12 +11,12 @@ Then in Dusklight: use the arrows on the Play button to pick **Archipelago**, st
 
 Needs Dusklight 2.0.1 or newer. This mod carries its own copy of the randomizer, so Dusklight's built-in Randomizer doesn't need updating or removing; the two don't interfere.
 
-## What's new in 1.6.0
+## What's new in 1.6.1
 
-- **Randomizer update (Twilit Realm's latest).** Logic now tells apart being in a twilight as a wolf or as a human, a Snowpeak Ruins logic fix, missing Castle Town and Ordon object fixes, and no more muted audio after the Forest Temple boss door.
-- **Update the mod and the apworld together** (mod 1.6.0, apworld 1.8.0). The logic changed, so each refuses seeds made with the other's old version. Finish runs already in progress on the versions you started them with.
+- **Randomizer 1.0.6.** The map now comes out after howling at the Snowpeak stone, and Kakariko's doors work during its twilight before you have the Kakariko portal.
+- The apworld is unchanged (1.8.0), and seeds from 1.6.0 keep working: just swap in the new `archipelago.dusk`.
 
-New in 1.5.1: connecting works on Linux ([#2](https://github.com/noahsmaximum/dusklight-archipelago/issues/2)).
+New in 1.6.0: Twilit Realm's logic update (twilight as wolf or human). Update the mod and the apworld together from 1.5.x.
 
 ## Updating
 
