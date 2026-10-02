@@ -9,3 +9,6 @@ mod.json
 apworld/tp_dusklight/data/
 build-android/
 __pycache__/
+
+# rig: a personal SteamGridDB key never goes in the repo
+rig/sgdb_key.txt

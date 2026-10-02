@@ -41,7 +41,11 @@ def main() -> int:
         print(__doc__)
         return 2
     expected = python_version()
-    out = subprocess.run([sys.argv[1], "--data-version"], capture_output=True, text=True,
+    # Resolved, and with .exe added on Windows, so `build/ap_gen_test` works everywhere.
+    exe = Path(sys.argv[1]).resolve()
+    if not exe.exists() and exe.with_suffix(".exe").exists():
+        exe = exe.with_suffix(".exe")
+    out = subprocess.run([str(exe), "--data-version"], capture_output=True, text=True,
                          check=True).stdout.strip()
     actual = int(out.split()[-1])
     if actual != expected:

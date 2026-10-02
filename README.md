@@ -187,6 +187,9 @@ A few options are fixed by this world:
 
 ## Building
 
+Want to contribute? [CONTRIBUTING.md](CONTRIBUTING.md) covers setup, tests and pull requests, and
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) explains how it all works.
+
 ```sh
 git clone https://github.com/noahsmaximum/dusklight-archipelago
 cd dusklight-archipelago
