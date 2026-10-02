@@ -22,6 +22,7 @@ Features
    * Extreme: about 450 checks
    * Ultimate, Hero of Twilight and Hero of Time: every check in the game (about 570) at Normal, Hard and hardest difficulty
 * Shuffled Dungeons option (0–9) so you can control how long a run is.
+* Optional Collect Dungeon on Completion: beat a boss and every check left in that dungeon is collected at once, for everyone.
 * Refuses a seed made with a different apworld version, so logic never silently differs from Archipelago's.
 * One download covers every platform Dusklight runs on, and it runs alongside Dusklight's built-in randomizer without conflicts.
 

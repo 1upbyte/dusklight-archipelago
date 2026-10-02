@@ -34,7 +34,7 @@ game: Twilight Princess (Dusklight)
 requires:
   version: 0.6.2 # Version of Archipelago required for this yaml to work as expected.
   game:
-    Twilight Princess (Dusklight): 1.8.0 # Version of the world required for this yaml to work as expected.
+    Twilight Princess (Dusklight): 1.9.0 # Version of the world required for this yaml to work as expected.
 
 Twilight Princess (Dusklight):
   ################
@@ -673,6 +673,13 @@ Twilight Princess (Dusklight):
     random-low: 0 # random value weighted towards lower values
     random-high: 0 # random value weighted towards higher values
     random-range-0-9: 0 # random value between 0 and 9
+
+  collect_dungeon_on_completion:
+    # When you beat a dungeon's boss, every check still left in that dungeon is collected at
+    # once: other players get their items right away, and yours arrive in-game. Chests you go
+    # back to afterwards hold a green rupee. Hyrule Castle is the goal, so it isn't included.
+    'false': 50
+    'true': 0
 
   death_link:
     # When you die, everyone who enabled death link dies. Of course, the reverse is true too.

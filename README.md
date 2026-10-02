@@ -123,6 +123,15 @@ the ones that only exist inside Archipelago) stay Sols, as does everything when 
 To use your own art for a game, put a PNG or JPG named after the game (as the room lists it) in
 `randomizer/archipelago/covers/custom`.
 
+### Collect Dungeon on Completion
+
+Set `collect_dungeon_on_completion: true` in your YAML and beating a dungeon's boss collects
+every check still left in that dungeon: other players get their items at once, and yours arrive
+in-game without the usual fanfares, with one pop-up listing them. Chests you go back to
+afterwards hold a green rupee, so nothing is given twice. It counts from the boss's heart
+container or the dungeon's reward, whichever you get first, and skips Hyrule Castle (beating
+its boss is the goal).
+
 Picking up another player's item plays a jingle for how important it is to them, going by
 Archipelago's item classification: the full item-get fanfare for progression, the heart-piece
 jingle for useful items, the rupee jingle for filler, and the save menu's "No" sound for traps.

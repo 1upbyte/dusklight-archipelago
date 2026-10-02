@@ -628,7 +628,7 @@ class TPWorld(World):
         # Unshuffled dungeons: the in-game generator only knows the randomizer's own settings,
         # so without these their chests would come up empty.
         placements.update(self._dungeon_locked)
-        return {
+        slot: dict[str, Any] = {
             "version": SLOT_DATA_VERSION,
             "data_version": data.data_version(),
             "seed": self.multiworld.seed_name,
@@ -641,6 +641,31 @@ class TPWorld(World):
             # create_regions does ("held").
             "unshuffled_dungeons": sorted(self._vanilla_dungeons),
         }
+        if self.options.collect_dungeon_on_completion:
+            slot["collect_dungeons"] = self._collect_dungeons()
+        return slot
+
+    def _collect_dungeons(self) -> list[dict[str, Any]]:
+        """Collect Dungeon on Completion: each shuffled dungeon's checks, which of them mean
+        its boss is beaten (the dungeon reward and the boss's heart container), and the item
+        number of anything at them that's this world's own, for the mod to hand over."""
+        real = set(self._real_location_names)
+        out: list[dict[str, Any]] = []
+        for dungeon in data.DUNGEONS:
+            if dungeon == "Hyrule Castle" or dungeon in self._vanilla_dungeons:
+                continue
+            names = sorted(n for n in self.location_name_groups[dungeon] if n in real)
+            triggers = [n for n in names if n.endswith(("Dungeon Reward", "Heart Container"))]
+            if not names or not triggers:
+                continue
+            locations = []
+            for name in names:
+                item = self.get_location(name).item
+                own = (item is not None and item.player == self.player and item.game == GAME
+                       and item.name in _GIVEABLE)
+                locations.append({"name": name, "item": _GIVEABLE[item.name].id if own else -1})
+            out.append({"dungeon": dungeon, "triggers": triggers, "locations": locations})
+        return out
 
     def write_spoiler_header(self, spoiler_handle) -> None:
         spoiler_handle.write(f"Vanilla-locked checks ({self.player_name}): {len(self._vanilla_locked)}\n")

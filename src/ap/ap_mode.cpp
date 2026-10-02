@@ -98,6 +98,10 @@ struct SaveState {
     std::string slot;
     int deathLink = -1;   // -1 follow the YAML, 0 off, 1 on (toggled from the Archipelago tab)
     bool transformAnywhere = false;  // the slot's Logic Transform Anywhere, kept for offline play
+    // Collect Dungeon on Completion: dungeons already collected, and the locations that were
+    // collected that way (their chests then hold a green rupee, even offline).
+    std::vector<std::string> redeemedDungeons;
+    std::vector<std::string> redeemedLocations;
 };
 
 enum class Phase {
@@ -145,6 +149,19 @@ std::vector<int64_t> g_toSend;
 // Items
 std::vector<NetworkItem> g_serverItems;
 int g_outstanding = -1;
+// Collect Dungeon on Completion (slot data "collect_dungeons"): per shuffled dungeon, the
+// checks that mean its boss is beaten, and every check in it with our own item's number (or
+// -1 when the item is another world's).
+struct CollectDungeon {
+    std::string name;
+    std::vector<std::string> triggers;
+    std::vector<std::pair<std::string, int>> locations;
+};
+std::vector<CollectDungeon> g_collectDungeons;
+std::unordered_set<std::string> g_redeemedLocations;  // mirrors g_state.redeemedLocations
+// Items handed over for a collected dungeon that the give queue hasn't confirmed yet. Server
+// items wait meanwhile, so these confirmations are never counted as server items.
+int g_redeemPending = 0;
 std::string g_outstandingDesc;
 
 // New-save UI
@@ -352,6 +369,16 @@ bool read_blob(const char* name, T& out) {
         out.slot = j.value("slot", "");
         out.deathLink = j.value("death_link", -1);
         out.transformAnywhere = j.value("transform_anywhere", false);
+        for (const char* key : {"redeemed_dungeons", "redeemed_locations"}) {
+            auto& list = std::string_view(key) == "redeemed_dungeons" ? out.redeemedDungeons
+                                                                       : out.redeemedLocations;
+            const json names = j.value(key, json::array());
+            for (const auto& n : names) {
+                if (n.is_string()) {
+                    list.push_back(n.get<std::string>());
+                }
+            }
+        }
     }
     return true;
 }
@@ -365,7 +392,9 @@ void write_conn() {
 void write_state() {
     const std::string s = json{{"received", g_state.received}, {"goal", g_state.goal},
         {"seed", g_state.seed}, {"slot", g_state.slot}, {"death_link", g_state.deathLink},
-        {"transform_anywhere", g_state.transformAnywhere}}
+        {"transform_anywhere", g_state.transformAnywhere},
+        {"redeemed_dungeons", g_state.redeemedDungeons},
+        {"redeemed_locations", g_state.redeemedLocations}}
                               .dump();
     svc_mng.save->set_blob(svc_mng.mod_ctx, kStateBlob, s.data(), s.size());
 }
@@ -575,6 +604,30 @@ bool load_slot_data(const json& slotData, std::string& err) {
     }
     g_slotSeed = slotData.value("seed", "");
     build_check_map();
+    g_collectDungeons.clear();
+    const json collect = slotData.value("collect_dungeons", json::array());
+    for (const auto& d : collect) {
+        if (!d.is_object()) {
+            continue;
+        }
+        CollectDungeon cd;
+        cd.name = d.value("dungeon", std::string{});
+        const json triggers = d.value("triggers", json::array());
+        for (const auto& t : triggers) {
+            if (t.is_string()) {
+                cd.triggers.push_back(t.get<std::string>());
+            }
+        }
+        const json locs = d.value("locations", json::array());
+        for (const auto& l : locs) {
+            if (l.is_object() && l.contains("name") && l["name"].is_string()) {
+                cd.locations.emplace_back(l["name"].get<std::string>(), json_num(l, "item", -1));
+            }
+        }
+        if (!cd.name.empty() && !cd.triggers.empty()) {
+            g_collectDungeons.push_back(std::move(cd));
+        }
+    }
     g_unshuffled.clear();
     g_unshuffledKnown = slotData.contains("unshuffled_dungeons");
     for (const auto& d : slotData.value("unshuffled_dungeons", json::array())) {
@@ -827,7 +880,18 @@ void on_disconnected(const std::string& reason) {
 // ---------------------------------------------------------------------------------------
 // ItemService callbacks
 
-bool resolve_check(ModContext*, const ItemCheckInfo* info, ItemCheckResolution*, void*) {
+bool resolve_check(ModContext*, const ItemCheckInfo* info, ItemCheckResolution* out, void*) {
+    // Collect Dungeon on Completion already handed this check over: what's left is a green
+    // rupee, so going back for it doesn't give its item a second time.
+    if (!g_redeemedLocations.empty() && info->name != nullptr) {
+        const auto locs = locations_for_check(info->name);
+        if (!locs.empty() && g_redeemedLocations.contains(locs.front())) {
+            out->item = dItemNo_Randomizer_GREEN_RUPEE_e;
+            out->display_item = dItemNo_Randomizer_GREEN_RUPEE_e;
+            out->was_resolved = true;
+            return true;
+        }
+    }
     // Runs after the randomizer's resolver; only remembers where the last AP item came from.
     if (info->current_item == kApItem) {
         const auto locs = locations_for_check(info->name);
@@ -876,6 +940,12 @@ void observe_give(ModContext*, const ItemGiveInfo* info, void*) {
         if (info->item == kApItem && !locs.empty()) {
             g_lastResolvedApLocation = locs.front();
         }
+        return;
+    }
+    if ((info->origin == ITEM_GIVE_ORIGIN_QUEUE || info->origin == ITEM_GIVE_ORIGIN_QUEUE_SILENT) &&
+        g_redeemPending > 0)
+    {
+        --g_redeemPending;  // a collected dungeon's item, not a server item
         return;
     }
     if ((info->origin == ITEM_GIVE_ORIGIN_QUEUE || info->origin == ITEM_GIVE_ORIGIN_QUEUE_SILENT) &&
@@ -1355,8 +1425,73 @@ void flush_checks() {
     }
 }
 
+// Collect Dungeon on Completion: once a dungeon's boss is beaten (its reward or the boss's
+// heart container is checked, here or from the server), every check left in it is sent, and
+// our own items among them are handed over quietly with one summary.
+void tick_dungeon_collect() {
+    if (g_collectDungeons.empty() || !in_gameplay() || g_outstanding >= 0 || g_redeemPending > 0) {
+        return;
+    }
+    for (const auto& d : g_collectDungeons) {
+        if (std::find(g_state.redeemedDungeons.begin(), g_state.redeemedDungeons.end(), d.name) !=
+            g_state.redeemedDungeons.end()) {
+            continue;
+        }
+        const bool beaten = std::any_of(d.triggers.begin(), d.triggers.end(), [](const auto& t) {
+            const auto it = g_locationIds.find(t);
+            return it != g_locationIds.end() && g_checked.contains(it->second);
+        });
+        if (!beaten) {
+            continue;
+        }
+        int sent = 0;
+        std::vector<std::string> mine;
+        for (const auto& [loc, item] : d.locations) {
+            const auto id = g_locationIds.find(loc);
+            if (id == g_locationIds.end() || g_checked.contains(id->second)) {
+                continue;
+            }
+            g_toSend.push_back(id->second);
+            g_checked.insert(id->second);
+            g_state.redeemedLocations.push_back(loc);
+            g_redeemedLocations.insert(loc);
+            ++sent;
+            // Our own item: the chest won't give it now, so hand it over. A Foolish Item stays
+            // in the chest's place as nothing; it would only hurt.
+            if (item > 0 && item <= 0xFE && item != dItemNo_Randomizer_FOOLISH_ITEM_e) {
+                const auto give = static_cast<uint8_t>(verifyProgressiveItem(static_cast<u32>(item)));
+                if (svc_mng.item->give_item(svc_mng.mod_ctx, nullptr, give, ITEM_GIVE_SILENT) == MOD_OK) {
+                    ++g_redeemPending;
+                    mine.push_back(item_name(give));
+                }
+            }
+        }
+        g_state.redeemedDungeons.push_back(d.name);
+        write_state();
+        ap_log(fmt::format("collected {}: {} checks, {} own items", d.name, sent, mine.size()));
+        if (sent > 0) {
+            std::string body = fmt::format("{} cleared: collected {} check{}.", d.name, sent,
+                sent == 1 ? "" : "s");
+            if (!mine.empty()) {
+                body += " Yours: ";
+                for (size_t i = 0; i < mine.size() && i < 4; ++i) {
+                    body += (i ? ", " : "") + mine[i];
+                }
+                if (mine.size() > 4) {
+                    body += fmt::format(" and {} more", mine.size() - 4);
+                }
+                body += ".";
+            }
+            toast("Archipelago", body, "success", 7000);
+        }
+        g_reachInputs = SIZE_MAX;
+        ++g_trackerVersion;
+        return;  // one dungeon per tick; the rest follow once these gives are confirmed
+    }
+}
+
 void deliver_items() {
-    if (!in_gameplay() || g_outstanding >= 0 ||
+    if (!in_gameplay() || g_outstanding >= 0 || g_redeemPending > 0 ||
         g_state.received >= static_cast<int>(g_serverItems.size()))
     {
         return;
@@ -1593,6 +1728,8 @@ ModResult on_new_save(void* ud, ModError* err) {
     g_loadedHash = randomizer_GetContext().mHash;
     g_needsRegen = false;
     g_outstanding = -1;
+    g_redeemPending = 0;
+    g_redeemedLocations.clear();
     g_phase = Phase::Playing;
     ap_log(fmt::format("new save created, hash {}, scan list {}", g_loadedHash, g_scan.size()));
     after_seed_activated();
@@ -1601,6 +1738,7 @@ ModResult on_new_save(void* ud, ModError* err) {
 
 ModResult on_save_loaded(void* ud, ModError* err) {
     g_outstanding = -1;
+    g_redeemPending = 0;
     g_toSend.clear();
     Conn conn;
     SaveState state;
@@ -1630,6 +1768,7 @@ ModResult on_save_loaded(void* ud, ModError* err) {
     const bool sameSession = g_client.state() == State::Connected && g_haveSlot &&
                              g_state.seed == state.seed && g_conn.slot == conn.slot;
     g_state = state;
+    g_redeemedLocations = {g_state.redeemedLocations.begin(), g_state.redeemedLocations.end()};
     g_phase = Phase::Playing;
     if (!haveConn) {
         toast("Archipelago", "This save has no Archipelago connection info.", "warning");
@@ -1650,6 +1789,8 @@ ModResult on_save_loaded(void* ud, ModError* err) {
 ModResult on_game_reset(void*, ModError*) {
     g_phase = Phase::Idle;
     g_outstanding = -1;
+    g_redeemPending = 0;
+    g_redeemedLocations.clear();
     reset_tracker();
     return MOD_OK;
 }
@@ -2993,6 +3134,7 @@ void tick() {
         }
         log_stage_changes();
         scan_locations();
+        tick_dungeon_collect();
         flush_checks();
         deliver_items();
         tick_death_link();

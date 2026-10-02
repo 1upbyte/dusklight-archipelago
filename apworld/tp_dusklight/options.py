@@ -133,6 +133,13 @@ class ShuffledDungeons(Range):
     default = len(data.DUNGEONS)
 
 
+class CollectDungeonOnCompletion(Toggle):
+    """When you beat a dungeon's boss, every check still left in that dungeon is collected at
+    once: other players get their items right away, and yours arrive in-game. Chests you go
+    back to afterwards hold a green rupee. Hyrule Castle is the goal, so it isn't included."""
+    display_name = "Collect Dungeon on Completion"
+
+
 EXPOSED: dict[str, str] = {}  # option attribute -> setting name
 _fields: list[tuple[str, type]] = []
 for _info in data.settings().values():
@@ -145,6 +152,8 @@ for _info in data.settings().values():
 
 # Archipelago-only: decided here, sent to the mod as explicit placements (see fill_slot_data).
 _fields.append(("shuffled_dungeons", ShuffledDungeons))
+# Archipelago-only: carried out by the mod (see fill_slot_data, "collect_dungeons").
+_fields.append(("collect_dungeon_on_completion", CollectDungeonOnCompletion))
 _fields.append(("start_inventory_from_pool", StartInventoryPool))
 # Archipelago's own option, not a randomizer setting: the mod joins the DeathLink channel.
 _fields.append(("death_link", DeathLink))
