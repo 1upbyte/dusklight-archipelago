@@ -52,6 +52,11 @@ Reconnect. That tab also shows connection status, items received and checks sent
 Anything you collect while disconnected is sent the next time you connect, and items you were
 given while away arrive when you load the save.
 
+<p align="center">
+  <img src="docs/images/other-world-item.webp" alt="Link holding another player's item, with the text box naming whose it is" width="49%">
+  <img src="docs/images/shop.webp" alt="A shop selling an Archipelago item" width="49%">
+</p>
+
 ### Servers and encryption
 
 Both `ws://` and `wss://` work. The mod handles WebSocket, TLS and `permessage-deflate`
@@ -81,6 +86,11 @@ The **Archipelago** tab (F1) also has:
   commands like `!remaining`. Emoji render as images, and the Emoji button inserts codes like
   `:joy:`.
 
+<p align="center">
+  <img src="docs/images/tracker.webp" alt="The Tracker page: checks in logic, by region" width="49%">
+  <img src="docs/images/messages.webp" alt="The Messages page: room log and chat" width="49%">
+</p>
+
 **Death link**: Set `death_link: true` to share deaths with everyone in the multiworld who has it on. A bottled
 fairy still saves you from a received death, and a fairy save doesn't send one. A death that
 arrives during a cutscene or conversation waits until it ends. You can toggle death link per
@@ -93,6 +103,10 @@ is. Choose what it shows (connection status, checks and logic, received items, o
 recent chat, death link) and set its position, edge distance, size and background. It's off by
 default.
 
+<p align="center">
+  <img src="docs/images/overlay.webp" alt="The overlay during play: connection, checks, logic and open hints" width="80%">
+</p>
+
 ### Game boxes
 
 Other players' items can appear as their game's box art instead of a Sol. Covers come from
@@ -102,6 +116,10 @@ the Status page (F1). Covers download once to `randomizer/archipelago/covers`. G
 SteamGridDB doesn't have stay Sols, and so does everything if there's no key. For custom art, put
 a PNG or JPG named after the game (as the room lists it) in
 `randomizer/archipelago/covers/custom`.
+
+<p align="center">
+  <img src="docs/images/game-box.webp" alt="Link holding a Shadow the Hedgehog game box, with the cover in the text box" width="80%">
+</p>
 
 Picking up another player's item plays a jingle based on its classification: the item fanfare
 for progression, the heart-piece jingle for useful, the rupee jingle for filler, and the save
