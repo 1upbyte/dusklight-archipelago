@@ -148,6 +148,18 @@ set(RANDOMIZER_SOURCES
         src/ap/emoji.cpp
         src/ap/ap_overlay.cpp
         src/ap/ap_covers.cpp
+        src/ap/mode/common.cpp
+        src/ap/mode/slot.cpp
+        src/ap/mode/items.cpp
+        src/ap/mode/hooks.cpp
+        src/ap/mode/death_link.cpp
+        src/ap/mode/boxes.cpp
+        src/ap/mode/saves.cpp
+        src/ap/mode/tracker.cpp
+        src/ap/mode/messages.cpp
+        src/ap/mode/hints.cpp
+        src/ap/mode/overlay.cpp
+        src/ap/mode/status.cpp
         src/ap/ap_box.cpp
         src/ap/cover_art.cpp
 )
