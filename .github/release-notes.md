@@ -11,13 +11,12 @@ Then in Dusklight: use the arrows on the Play button to pick **Archipelago**, st
 
 Needs Dusklight 2.0.1 or newer. This mod carries its own copy of the randomizer, so Dusklight's built-in Randomizer doesn't need updating or removing; the two don't interfere.
 
-## What's new in 1.7.0
+## What's new in 1.7.1
 
-- **Collect Dungeon on Completion** (new YAML option, off by default). Beat a dungeon's boss and every check still left in it is collected at once: other players get their items right away, and yours arrive in-game with one summary pop-up. Chests you go back to afterwards hold a green rupee.
-- **Randomizer 1.0.6.** The map comes out after howling at the Snowpeak stone, and Kakariko's doors work during its twilight before you have the Kakariko portal.
-- Mod 1.7.0 and apworld 1.9.0. Logic is unchanged, so 1.6.0 multiworlds keep working with the new mod; the generating host needs apworld 1.9.0 to use the new option.
+- **No gameplay changes.** The mod's code is reorganised for contributors: the game mode is split into one file per area, the architecture and contributing guides and the test tools are now in the repo, and CI runs the host tests on every platform.
+- The apworld is unchanged (1.9.0), and 1.7.0 multiworlds keep working: just swap in the new `archipelago.dusk`.
 
-New in 1.6.0: Twilit Realm's logic update (twilight as wolf or human).
+New in 1.7.0: Collect Dungeon on Completion (YAML option) and randomizer 1.0.6.
 
 ## Updating
 
