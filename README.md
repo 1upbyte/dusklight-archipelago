@@ -54,93 +54,73 @@ given while away arrive when you load the save.
 
 ### Servers and encryption
 
-Both `ws://` and `wss://` work. The mod speaks WebSocket itself over a plain TCP socket, and
-wraps that in its own TLS for `wss://`, so nothing depends on the host's WebSocket support. It
-also takes the compressed messages Archipelago servers send (`permessage-deflate`), so they
-don't warn that the client doesn't support compression.
+Both `ws://` and `wss://` work. The mod handles WebSocket, TLS and `permessage-deflate`
+compression itself, so nothing depends on the host's WebSocket support.
 
-Type the room address the way Archipelago gives it to you (`archipelago.gg:12345`). Rooms are
-served either encrypted or plain, never both, so the mod tries the likely one first — TLS for
-a remote server, plain for `localhost` — and falls back to the other if that is refused. You
-can force one by typing the scheme yourself: `wss://archipelago.gg:12345`.
+Enter the room address as Archipelago gives it (`archipelago.gg:12345`). The mod tries TLS
+first for remote servers and plain for `localhost`, falling back to the other if refused. To
+force one, include the scheme: `wss://archipelago.gg:12345`.
 
-Server certificates are checked against a list of root authorities built into the mod, so a
-room with an expired, self-signed or mismatched certificate is refused rather than silently
-trusted. If you run your own server with a self-signed certificate, connect to it over plain
-`ws://` instead.
-
-### Death link
-
-Set `death_link: true` in your YAML and you share deaths with everyone else in the
-multiworld who has it on: when one of you dies, you all do. A bottled fairy still saves
-you from a death someone else sends, just as it would from your own, and a fairy save
-doesn't count as dying. A death that arrives during a cutscene or conversation waits until
-it's over.
-
-You can switch it on or off for a save from the **Archipelago** tab in the menu bar (F1),
-whatever the YAML said.
+Certificates are checked against built-in root authorities, and expired, self-signed or
+mismatched ones are refused. For a self-hosted server with a self-signed certificate, use
+`ws://`.
 
 ### Tracker, hints and messages
 
-The **Archipelago** tab in the menu bar (F1) has more pages for use mid-run:
+The **Archipelago** tab (F1) also has:
 
-- **Tracker** shows how many of your checks are done and which ones you can do right now. It
-  opens on everything in logic; pick a region to see all of its checks. A green dot is in
-  logic, a hollow dot isn't yet, and gray, crossed-out text is done. The logic is the seed's
-  own, worked out in the background from the items you have, so "in logic" means the same
-  thing it means to Archipelago.
-- **Hints** lists every hint that involves you: where your items are, and which of other
-  players' items are in your world. It shows your hint points and what a hint costs, and lets
-  you ask for one by item or by location. For hints on your own items you can set Priority,
-  No priority or Avoid, like in Archipelago's text client. New hints also pop up as they arrive.
-- **Messages** is everything the room says, newest first, in Archipelago's usual colors: items
-  found and sent, hints, chat. Type a message and press Send to chat, or send a server command
-  such as `!remaining`. Emoji show as pictures here and in pop-ups; the Emoji button adds one
-  to your message as a code like `:joy:`, which goes out as the emoji itself.
+- **Tracker**: your check progress and what's in logic right now. Pick a region to see all its
+  checks. Green dot = in logic, hollow = not yet, gray and crossed out = done. It uses the
+  seed's own logic, so it matches Archipelago. The save must have connected to its room, which
+  it does on load.
+- **Hints**: every hint involving you, meaning where your items are and which of other players'
+  items are in your world. It shows your hint points and the cost of a hint, and lets you
+  request hints by item or location. You can mark hints for your own items as Priority, No
+  priority or Avoid. New hints pop up as they arrive.
+- **Messages**: the room log, newest first, in Archipelago's colors. You can chat or send server
+  commands like `!remaining`. Emoji render as images, and the Emoji button inserts codes like
+  `:joy:`.
 
-The tracker needs the save to have connected to its room, which it does by itself when you load
-it.
+**Death link**: Set `death_link: true` to share deaths with everyone in the multiworld who has it on. A bottled
+fairy still saves you from a received death, and a fairy save doesn't send one. A death that
+arrives during a cutscene or conversation waits until it ends. You can toggle death link per
+save in the **Archipelago** tab (F1).
 
 ### Overlay
 
-The **Overlay** page of the Archipelago tab turns on a small panel that stays on screen while you
-play, drawn in the game's own HUD so it hides whenever the HUD does. Pick what it shows
-(connection status, checks and what's in logic, items you just received, open hints, recent
-chat, death link) and where: any corner or either side, with its distance from the edge, size
-and background. It starts switched off.
+The **Overlay** page turns on an on-screen panel drawn in the game's HUD, hidden whenever the HUD
+is. Choose what it shows (connection status, checks and logic, received items, open hints,
+recent chat, death link) and set its position, edge distance, size and background. It's off by
+default.
 
 ### Game boxes
 
-Items that belong to other worlds can show as the box of the game they're for, with its cover
-art, instead of a Sol: leaning back as it turns on the ground or in a shop, and upright in
-Link's hands when he picks it up. Covers come from [SteamGridDB](https://www.steamgriddb.com)
-with your own API key, which is free: sign in there, open Preferences, then API. The first time you play, the mod asks whether you want
-game boxes (and takes the key) or Sols; after that it's under **Other players' items** on the
-Status page of the Archipelago tab (F1). Each game's cover downloads once and is kept in
-`randomizer/archipelago/covers` for every room after that. Games SteamGridDB doesn't have (and
-the ones that only exist inside Archipelago) stay Sols, as does everything when there's no key.
-To use your own art for a game, put a PNG or JPG named after the game (as the room lists it) in
+Other players' items can appear as their game's box art instead of a Sol. Covers come from
+[SteamGridDB](https://www.steamgriddb.com) using your free API key (sign in, then Preferences →
+API). The mod asks on first play, and you can change it later under **Other players' items** on
+the Status page (F1). Covers download once to `randomizer/archipelago/covers`. Games
+SteamGridDB doesn't have stay Sols, and so does everything if there's no key. For custom art, put
+a PNG or JPG named after the game (as the room lists it) in
 `randomizer/archipelago/covers/custom`.
+
+Picking up another player's item plays a jingle based on its classification: the item fanfare
+for progression, the heart-piece jingle for useful, the rupee jingle for filler, and the save
+menu's "No" sound for traps.
 
 ### Collect Dungeon on Completion
 
-Set `collect_dungeon_on_completion: true` in your YAML and beating a dungeon's boss collects
-every check still left in that dungeon: other players get their items at once, and yours arrive
-in-game without the usual fanfares, with one pop-up listing them. Chests you go back to
-afterwards hold a green rupee, so nothing is given twice. It counts from the boss's heart
-container or the dungeon's reward, whichever you get first, and skips Hyrule Castle (beating
-its boss is the goal).
-
-Picking up another player's item plays a jingle for how important it is to them, going by
-Archipelago's item classification: the full item-get fanfare for progression, the heart-piece
-jingle for useful items, the rupee jingle for filler, and the save menu's "No" sound for traps.
+Set `collect_dungeon_on_completion: true` and beating a dungeon's boss collects every remaining
+check there. Other players get their items immediately, and yours arrive without fanfares, with
+one pop-up listing them. Chests you open afterwards hold a green rupee. This triggers on the
+boss's heart container or the dungeon reward, whichever comes first. Hyrule Castle is skipped,
+since its boss is the goal.
 
 ## Presets
 
-`presets/` holds seven ready-made YAMLs, each verified to generate and to rebuild exactly in
-the in-game generator. The first four step up in both length and difficulty; the last three
-are the whole game at rising difficulty. Check counts are averages: which dungeons stay
-unshuffled is random per seed, and dungeons differ in size.
+`presets/` has seven YAMLs, each verified to generate and rebuild exactly in the in-game
+generator. The first four scale up in length and difficulty, and the last three are the full
+game at rising difficulty. Check counts are averages, since which dungeons stay unshuffled
+varies per seed.
 
 | Preset | Checks | Difficulty | What it is |
 | --- | --- | --- | --- |
@@ -148,51 +128,43 @@ unshuffled is random per seed, and dungeons differ in size.
 | Normal | ~200 | Normal | Prologue skipped, twilights mostly intact, keys move between dungeons, hidden skills shuffled, three dungeons, a few traps, castle wants four dungeons. |
 | Hard | ~300 | Hard | Nothing skipped, keys anywhere, golden bugs, sky characters, hidden skills and shops shuffled, six dungeons, many traps, double damage. |
 | Extreme | ~450 | Extreme | Hard plus a minimal pool, one-hit kills, bonks that hurt, traps everywhere, eight dungeons, and a castle that wants all eight dungeons and all 60 poe souls. |
-| Ultimate | ~570 | Normal | Every possible check — all nine dungeons, every bug, sky character, gift, shop item, hidden skill, rupee and poe — at Normal's difficulty. |
+| Ultimate | ~570 | Normal | Every possible check (all nine dungeons, every bug, sky character, gift, shop item, hidden skill, rupee and poe) at Normal's difficulty. |
 | Hero of Twilight | ~570 | Hard | Every possible check at Hard's difficulty. |
 | Hero of Time | ~570 | Hardest | Every possible check with Extreme's punishment, and every piece of junk replaced by a trap. |
 
-Easy, Normal, Hard and Extreme start you with the Shadow Crystal, so you can turn into a wolf
-from the beginning, and let you transform in front of NPCs (see above). Ultimate, Hero of
-Twilight and Hero of Time play it straight: you find the crystal and transform where the game
-allows.
+Easy through Extreme start you with the Shadow Crystal and allow transforming in front of NPCs
+(see above). Ultimate, Hero of Twilight and Hero of Time make you find the crystal and follow
+the game's normal transform rules.
 
-Every preset keeps other players' important items out of Hyrule Castle (see below), and Easy,
-Normal and Hard raise `progression_balancing` (90, 80, 70) so this game's progression turns up
-earlier and there's less waiting in the long tail.
+Every preset keeps other players' important items out of Hyrule Castle (see below). Easy, Normal
+and Hard also raise `progression_balancing` (90, 80, 70) so your progression shows up earlier.
 
-Copy one into your Archipelago `Players` folder and set `name:` to your slot name. The
-release also carries `Template.yaml`, the full template with every option explained.
+Copy a preset into your Archipelago `Players` folder and set `name:` to your slot name.
 
 ## Options
 
-The YAML options are generated from the randomizer's own settings, so they match the names in
-the in-game randomizer menus, and each one is explained in the template with the randomizer's
-own description.
+Options are generated from the randomizer's settings, so their names match the in-game menus,
+and the template explains each one.
 
-Left unset, an option gives you the most checks it can: every optional shuffle is on, every
-poe soul is a check, and dungeon items stay in their own dungeon. That's the whole game, so
-for anything shorter start from a preset.
+Unset options maximize checks: every shuffle is on, every poe soul is a check, and dungeon items
+stay in their own dungeon. For a shorter run, start from a preset.
 
-**Shuffled Dungeons** (0–9) is this world's own: how many dungeons have their contents
-shuffled into the multiworld. The rest, picked at random for each seed, keep their vanilla
-chests, keys, maps and big items. You still play them and logic still expects their items, but
-they aren't checks, which is how the shorter presets get down to their size. The spoiler log
-lists which dungeons stayed vanilla.
+**Shuffled Dungeons** (0–9) sets how many dungeons are shuffled into the multiworld. The rest,
+chosen randomly per seed, stay vanilla. You still play them and logic still needs their items,
+but they aren't checks. The spoiler log lists which dungeons stayed vanilla.
 
-**Every preset excludes Hyrule Castle.** It's the final dungeon, so an item another player
-needs from there only turns up at the very end of your game, and they'd wait on your whole
-run for it. Excluded checks still exist; they just never hold an item another player needs
-(a dungeon's own keys can still be inside it when keys stay in their dungeon). Each dungeon
-is a location group, so `exclude_locations: [Hyrule Castle, Palace of Twilight]` works. The
-template and any YAML that leaves the option out exclude nothing.
+**Every preset excludes Hyrule Castle.** It's the final dungeon, so items there would leave
+other players waiting on your whole run. Excluded checks still exist but never hold an item
+another player needs (a dungeon's own keys can still be there if keys stay in their dungeon).
+Each dungeon is a location group, e.g. `exclude_locations: [Hyrule Castle, Palace of Twilight]`.
+The template excludes nothing.
 
 A few options are fixed by this world:
 
 - **Entrance randomization** and **randomized starting spawn** are off. The in-game generator
-  only sees your own world, so it can't place entrances consistently with the multiworld yet.
-- **In-game hints** (hint signs, Midna hints) are off, because the randomizer's hint generator
-  can't see other players' worlds. Use Archipelago's own hint system instead.
+  only sees your world, so it can't place entrances consistently with the multiworld yet.
+- **In-game hints** (hint signs, Midna hints) are off because the randomizer can't see other
+  worlds. Use Archipelago's hints instead.
 - **Unrequired dungeons are barren** is off, and logic is always "all locations reachable".
 
 ## Building
