@@ -91,6 +91,16 @@ jobs:
         if: matrix.platform == 'linux-x86_64'
         run: python3 tools/check_data_version.py build/ap_gen_test
 
+      # Host tests (text sanitising, compression, emoji, cover matching) where the runner can
+      # run what it built. The TLS cases need outside servers, so they stay a local check.
+      - name: Host tests
+        if: contains(fromJSON('["linux-x86_64", "linux-aarch64", "macos-arm64", "windows-amd64"]'), matrix.platform)
+        shell: bash
+        run: |
+          exe=build/tls_test
+          [[ -f build/tls_test.exe ]] && exe=build/tls_test.exe
+          "$exe" --offline
+
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:

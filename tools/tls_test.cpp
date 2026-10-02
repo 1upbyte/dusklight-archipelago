@@ -9,6 +9,7 @@
 //
 //     tls_test
 //     tls_test archipelago.gg:443=ok expired.badssl.com:443=fail
+//     tls_test --offline      (everything but the TLS cases: no network needed)
 //
 // Exits non-zero if any case did not behave as expected.
 //
@@ -437,11 +438,13 @@ int main(int argc, char** argv) {
         return covers_live(argc, argv);
     }
 
+    // --offline: only the in-process checks, none of the TLS cases against real servers (CI).
+    const bool offline = argc >= 2 && std::strcmp(argv[1], "--offline") == 0;
     std::vector<Case> cases;
-    for (int i = 1; i < argc; ++i) {
+    for (int i = offline ? 2 : 1; i < argc; ++i) {
         cases.push_back(parse(argv[i]));
     }
-    if (cases.empty()) {
+    if (cases.empty() && !offline) {
         cases = {
             {"archipelago.gg", "443", true},
             {"github.com", "443", true},
