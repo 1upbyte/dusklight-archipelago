@@ -7,6 +7,7 @@
 #include "item.hpp"
 #include "session.hpp"
 #include "ap/ap_mode.hpp"
+#include "tp_map_server.hpp"
 
 DEFINE_MOD();
 IMPORT_SERVICE(HostService, svc_host);
@@ -50,17 +51,21 @@ MOD_EXPORT ModResult mod_initialize(ModError* error) {
         return mods::set_error(error, result, "failed to initialize session");
     }
 
+    tp_map_server::start();
+
     svc_log->info(mod_ctx, "randomizer " FULL_RANDOMIZER_VERSION " initialized");
     return MOD_OK;
 }
 
 MOD_EXPORT ModResult mod_update(ModError*) {
     ap::update();
+    tp_map_server::tick();
     // we register update function with game mode service, so no need to do anything here
     return MOD_OK;
 }
 
 MOD_EXPORT ModResult mod_shutdown(ModError*) {
+    tp_map_server::stop();
     randomizer::session::shutdown();
     svc_log->info(mod_ctx, "randomizer unloaded");
     return MOD_OK;

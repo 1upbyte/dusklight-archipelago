@@ -5,6 +5,8 @@
 // reports checks while the randomizer runtime plays the seed like any other.
 
 #include "mods/svc/game_mode.h"
+#include <string>
+#include <vector>
 
 namespace ap {
 
@@ -16,6 +18,9 @@ void deactivate();
 void tick();
 // Every host frame, even while the game is paused behind a UI window (network, seed build).
 void update();
+
+// Current slot's server-confirmed and locally queued checks for the local tp-map page.
+bool tp_map_snapshot(std::string& seed, std::vector<std::string>& checks);
 
 // Replaces the randomizer's new-file seed gate: connect to the server, build the seed from
 // slot data, then continue to name entry.

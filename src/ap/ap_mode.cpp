@@ -179,6 +179,16 @@ void update() {
     tick_generation();
 }
 
+bool tp_map_snapshot(std::string& seed, std::vector<std::string>& checks) {
+    if (g_phase == Phase::Idle) return false;
+    if (g_phase != Phase::Playing || g_slotSeed.empty()) return true;
+    seed = "ap:" + g_slotSeed;
+    for (const auto& check : g_trackerChecks) {
+        if (g_checked.contains(check.id)) checks.push_back(check.name);
+    }
+    return true;
+}
+
 void tick() {
     if (g_armedFrames > 0) {
         --g_armedFrames;

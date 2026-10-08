@@ -8,6 +8,8 @@ dusklight/
 mod.json
 apworld/tp_dusklight/data/
 build-android/
+res/tp-map/
+tp-map/
 __pycache__/
 
 # rig: a personal SteamGridDB key never goes in the repo

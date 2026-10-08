@@ -15,6 +15,7 @@
 #include "verify_item_functions.h"
 #include "../generator/utility/text.hpp"
 #include "ap/ap_mode.hpp"
+#include "tp_map_server.hpp"
 
 #include "d/d_com_inf_game.h"
 #include "d/d_item.h"
@@ -515,10 +516,13 @@ ModResult initialize(const ServiceManager& services) {
 
     UiModsPanelDesc panelDesc = UI_MODS_PANEL_DESC_INIT;
     panelDesc.build = [](ModContext* ctx, UiElementHandle pane, void*, ModError*) -> ModResult {
-        return svc_ui->pane_add_text(ctx, pane,
+        ModResult result = svc_ui->pane_add_text(ctx, pane,
             "To play, select \"Archipelago\" from the Dusklight menu, create a new save and enter "
             "your server, slot name and password. Existing saves reconnect automatically.",
             nullptr);
+        if (result != MOD_OK) return result;
+        svc_ui->pane_add_section(ctx, pane, "Local map");
+        return tp_map_server::add_port_control(ctx, pane);
     };
     result = svc_ui->register_mods_panel(mod_ctx, &panelDesc);
     return result;

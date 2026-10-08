@@ -131,6 +131,7 @@ set(RANDOMIZER_SOURCES
         src/verify_item_functions.cpp
         src/paths.cpp
         src/session.cpp
+        src/tp_map_server.cpp
         src/hooks.cpp
         src/item.cpp
         src/ui/config_store.cpp
@@ -182,6 +183,25 @@ endforeach ()
 
 # Root certificates for TLS, embedded so nothing has to ship next to the mod.
 b_embed(randomizer_embeds "src/ap/ca_bundle.pem")
+
+# tp-map is an upstream static site. Use a local checkout when present, otherwise fetch
+# the exact revision used to build this integration. Stage its assets in the mod's res tree
+# so the HTTP server can read them through ResourceService inside the .dusk bundle.
+if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tp-map/index.html")
+    set(TP_MAP_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/tp-map")
+else ()
+    FetchContent_Declare(tp_map
+        GIT_REPOSITORY https://github.com/DarkZant/tp-map.git
+        GIT_TAG 69efd0401a15c4872efa74218f75915ea7b342f3)
+    FetchContent_GetProperties(tp_map)
+    if (NOT tp_map_POPULATED)
+        FetchContent_Populate(tp_map)
+    endif ()
+    set(TP_MAP_SOURCE_DIR "${tp_map_SOURCE_DIR}")
+endif ()
+file(REMOVE_RECURSE "${CMAKE_CURRENT_SOURCE_DIR}/res/tp-map")
+file(COPY "${TP_MAP_SOURCE_DIR}/" DESTINATION "${CMAKE_CURRENT_SOURCE_DIR}/res/tp-map"
+    PATTERN ".git" EXCLUDE PATTERN ".gitignore" EXCLUDE)
 
 # Versioning
 set(RANDOMIZER_VERSION "1.0.6")

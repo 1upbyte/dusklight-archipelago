@@ -1,6 +1,7 @@
 // The Status tab and the Archipelago window that holds every tab.
 
 #include "internal.hpp"
+#include "../../tp_map_server.hpp"
 
 namespace ap::internal {
 namespace {
@@ -98,6 +99,9 @@ static ModResult build_status_tab(ModContext* ctx, UiWindowHandle, UiElementHand
     b2.label = "Disconnect";
     b2.on_pressed = press_disconnect;
     svc_mng.ui->pane_add_control(ctx, left, &b2, nullptr);
+
+    svc_mng.ui->pane_add_section(ctx, left, "Local map");
+    tp_map_server::add_port_control(ctx, left);
 
     svc_mng.ui->pane_add_section(ctx, left, "Other players' items");
     add_bound(ctx, left, UI_CONTROL_TOGGLE, "Show as game boxes", g_cfgBoxes,
