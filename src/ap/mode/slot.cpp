@@ -1,6 +1,7 @@
 // Slot data into lookup tables, and the seed rebuilt from it on a worker thread.
 
 #include "internal.hpp"
+#include "d/d_item_data.h"
 
 namespace ap::internal {
 
@@ -9,6 +10,26 @@ static int region_of(const YAML::Node& categories);
 static void build_check_map();
 static std::string sanitize(std::string s);
 static bool generate_seed(const json& slotData, const std::string& slot, std::string& outHash, std::string& outError);
+
+static std::optional<uint8_t> model_for_tp_item(const std::string& name) {
+    static const auto itemIds = [] {
+        std::unordered_map<std::string, int> ids;
+        for (const auto& node : LOAD_EMBED_YAML(RANDO_DATA_PATH "items.yaml")) {
+            ids.emplace(node["Name"].as<std::string>(), node["Id"].as<int>());
+        }
+        return ids;
+    }();
+    const auto it = itemIds.find(name);
+    if (it == itemIds.end() || it->second < 0 || it->second >= 255 || it->second == kApItem) {
+        return std::nullopt;
+    }
+    const auto id = static_cast<uint8_t>(it->second);
+    // Both the world pickup and Link's held-up item need a real get-item model.
+    if (dItem_data::getArcName(id) == nullptr || dItem_data::getBmdName(id) < 0) {
+        return std::nullopt;
+    }
+    return id;
+}
 
 
 // The randomizer tracker's own groups (src/ui/rando_config.cpp), plus "Other".
@@ -169,12 +190,18 @@ bool load_slot_data(const json& slotData, std::string& err) {
     }
     g_expected.clear();
     g_placementOwner.clear();
+    g_placementDisplayItem.clear();
     g_placementFlags.clear();
     const json placements = slotData.value("placements", json::object());
     for (const auto& [loc, v] : placements.items()) {
         if (v.is_object()) {
             g_placementOwner[loc] = v.value("player", "");
             g_placementFlags[loc] = json_num(v, "flags", 1);
+            if (g_client.gameOfSlotName(g_placementOwner[loc]) == "Twilight Princess (Dusklight)") {
+                if (const auto model = model_for_tp_item(v.value("name", ""))) {
+                    g_placementDisplayItem[loc] = *model;
+                }
+            }
         }
         g_expected[loc] = v.is_object() ? fmt::format("{} ({})", v.value("name", "?"),
                                               v.value("player", "?"))

@@ -165,6 +165,15 @@ bool resolve_check(ModContext*, const ItemCheckInfo* info, ItemCheckResolution* 
                 g_actorLocation[info->giver_actor] = locs.front();  // for its box (see draw)
             }
             g_heldActor = nullptr;  // a new pickup: the next held item is this one
+            if (const auto model = g_placementDisplayItem.find(locs.front());
+                model != g_placementDisplayItem.end()) {
+                // Display only: the grant remains the AP placeholder, so no local inventory
+                // change occurs and the check still sends the item to its actual owner.
+                out->item = kApItem;
+                out->display_item = model->second;
+                out->was_resolved = true;
+                return true;
+            }
         }
     }
     return false;

@@ -133,11 +133,16 @@ default.
 
 ### Game boxes
 
-Other players' items can appear as their game's box art instead of a Sol. Covers come from
+Another Twilight Princess (Dusklight) player's item shows that item's model when one is
+available. This changes only its appearance: the item still goes to its owner, and your
+inventory does not gain it. Items without a usable model keep the normal Archipelago
+appearance.
+
+Other games' items can appear as their game's box art instead of a Sol. Covers come from
 [SteamGridDB](https://www.steamgriddb.com) using your free API key (sign in, then Preferences →
 API). The mod asks on first play, and you can change it later under **Other players' items** on
-the Status page (F1). Covers download once to `randomizer/archipelago/covers`. Games
-SteamGridDB doesn't have stay Sols, and so does everything if there's no key. For custom art, put
+the Status page (F1). Covers download once to `randomizer/archipelago/covers`. Other games'
+items stay Sols when no cover or API key is available. For custom art, put
 a PNG or JPG named after the game (as the room lists it) in
 `randomizer/archipelago/covers/custom`.
 

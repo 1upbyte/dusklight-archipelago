@@ -84,8 +84,9 @@ static void prompt_boxes() {
     desc.title = "Other players' items";
     desc.icon = "question-mark";
     desc.body_rml =
-        "Items that belong to other players can show as the box of the game they're for, with "
-        "its cover art, instead of a Sol.<br/><br/>Covers come from SteamGridDB and need your "
+        "Another Twilight Princess player's item shows its item model when available. "
+        "Other games' items can show as their game box instead of a Sol.<br/><br/>"
+        "Covers come from SteamGridDB and need your "
         "own API key, which is free: sign in at steamgriddb.com, open Preferences, then API, "
         "and paste the key below.<br/><br/>You can change this any time on the Status page of "
         "the Archipelago tab (F1).";

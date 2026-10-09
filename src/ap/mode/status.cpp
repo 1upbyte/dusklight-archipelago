@@ -105,12 +105,12 @@ static ModResult build_status_tab(ModContext* ctx, UiWindowHandle, UiElementHand
 
     svc_mng.ui->pane_add_section(ctx, left, "Other players' items");
     add_bound(ctx, left, UI_CONTROL_TOGGLE, "Show as game boxes", g_cfgBoxes,
-        "Items that belong to other worlds show as the box of the game they're for, with its "
-        "cover art, instead of a Sol. Covers come from SteamGridDB with your own API key and "
-        "download once per game. Games without art stay Sols.");
+        "Other games' items show as their game box instead of a Sol. Another Twilight Princess "
+        "player's item shows its item model when available. Covers come from SteamGridDB with your own API key and "
+        "download once per game. Other games without art stay Sols.");
     add_bound(ctx, left, UI_CONTROL_STRING, "SteamGridDB API key", g_cfgSgdbKey,
         "Free: sign in at steamgriddb.com, then Preferences, API, and copy your key here. "
-        "It's only sent to SteamGridDB. Leave it empty and items stay Sols.");
+        "It's only sent to SteamGridDB. Without it, other games' items stay Sols.");
     g_coverStatusText = 0;
     svc_mng.ui->pane_add_text(ctx, left, covers::status().c_str(), &g_coverStatusText);
     UiControlDesc again = UI_CONTROL_DESC_INIT;

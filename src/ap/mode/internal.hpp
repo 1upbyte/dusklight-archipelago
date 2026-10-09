@@ -122,6 +122,9 @@ inline std::unordered_map<std::string, int64_t> g_locationIds;       // location
 inline std::unordered_map<std::string, std::string> g_apItemText;    // location name -> get text
 // Other worlds' items in this world: location -> the slot that owns it (for its game's box).
 inline std::unordered_map<std::string, std::string> g_placementOwner;
+// Another Twilight Princess player's item may use its own model, while the granted item
+// remains the Archipelago placeholder. Locations without a usable model are absent.
+inline std::unordered_map<std::string, uint8_t> g_placementDisplayItem;
 // ... and its Archipelago classification (1 progression, 2 useful, 4 trap; 0 filler).
 inline std::unordered_map<std::string, int> g_placementFlags;
 // Item actors that resolved to an AP item -> their location (from the check resolver).
