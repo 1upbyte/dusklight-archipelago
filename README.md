@@ -60,14 +60,17 @@ given while away arrive when you load the save.
 ### Live tp-map
 
 While the mod is enabled, open **http://127.0.0.1:38282/** on the same computer as
-Dusklight. The mod serves tp-map and checks off locations as its tracker or the
+Dusklight, or `http://YOUR_IP:38282/` from another device. The
+mod serves tp-map and checks off locations as its tracker or the
 Archipelago server records them. A save loaded before opening the page is synced
 on the first poll; later checks appear within about a second. The page uses
 tp-map's existing flag, item tracker, and requirement logic. You can import a
 Dusklight spoiler log through tp-map's normal seed import control if you want
 its seed settings and item placements shown too.
 
-The server listens only on localhost and stops when the mod unloads. Change
+The server listens on all IPv4 interfaces (`0.0.0.0`) and stops when the mod
+unloads. It serves the map and current seed/check progress over unauthenticated
+HTTP to devices that can reach that port. Change
 **Map port** in the mod's options panel or the Archipelago Status tab to use a
 different local port; the address changes immediately and the setting is saved.
 If the chosen port is already in use, the mod logs a warning and keeps the

@@ -170,20 +170,20 @@ void bind_port(int64_t port) {
         mods::log::warn("tp-map: invalid port {} (choose 1-65535)", port);
         return;
     }
-    const std::string bind = "tcp://127.0.0.1:" + std::to_string(port);
+    const std::string bind = "tcp://0.0.0.0:" + std::to_string(port);
     NetListenDesc desc = NET_LISTEN_DESC_INIT;
     desc.bind = bind.c_str();
     NetHandle nextListener = 0;
     NetEndpoint local{};
     NetError error = NET_ERROR_NONE;
     if (svc_net->listen(svc_mng.mod_ctx, &desc, &nextListener, &local, &error) != MOD_OK) {
-        mods::log::warn("tp-map: could not listen on 127.0.0.1:{} (net error {})", port, static_cast<int>(error));
+        mods::log::warn("tp-map: could not listen on 0.0.0.0:{} (net error {})", port, static_cast<int>(error));
         return;
     }
     stop();
     listener = nextListener;
     attemptedPort = port;
-    mods::log::info("tp-map available at http://127.0.0.1:{}/", port);
+    mods::log::info("tp-map listening on 0.0.0.0:{} (open http://127.0.0.1:{}/ locally)", port, port);
 }
 
 void stop() {
@@ -224,7 +224,7 @@ ModResult add_port_control(ModContext* ctx, UiElementHandle pane) {
     UiControlDesc control = UI_CONTROL_DESC_INIT;
     control.kind = UI_CONTROL_NUMBER;
     control.label = "Map port";
-    control.help_rml = "The local tp-map address is http://127.0.0.1:&lt;port&gt;/. Changes apply immediately. The map stays on this computer.";
+    control.help_rml = "Open http://127.0.0.1:&lt;port&gt;/ here, or use this computer's IP address from another device. Changes apply immediately.";
     control.binding = UI_BINDING_CONFIG_VAR;
     control.config_var = portOption;
     control.min = 1;
