@@ -15,7 +15,6 @@
 #include "verify_item_functions.h"
 #include "../generator/utility/text.hpp"
 #include "ap/ap_mode.hpp"
-#include "tp_map_server.hpp"
 
 #include "d/d_com_inf_game.h"
 #include "d/d_item.h"
@@ -521,8 +520,7 @@ ModResult initialize(const ServiceManager& services) {
             "your server, slot name and password. Existing saves reconnect automatically.",
             nullptr);
         if (result != MOD_OK) return result;
-        svc_ui->pane_add_section(ctx, pane, "Local map");
-        return tp_map_server::add_port_control(ctx, pane);
+        return MOD_OK;
     };
     result = svc_ui->register_mods_panel(mod_ctx, &panelDesc);
     return result;

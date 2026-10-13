@@ -1,5 +1,4 @@
 #include "ws_tcp.hpp"
-#include "../tp_map_server.hpp"
 
 #include <mods/svc/log.hpp>
 #include <mods/svc/net.hpp>
@@ -312,7 +311,6 @@ bool TcpWebSocket::poll(Event& out) {
     mods::net::Event ev;
     while (mods::net::poll(ev)) {
         if (ev.handle != mHandle || mHandle == 0) {
-            tp_map_server::on_net_event(ev);
             continue;
         }
         switch (ev.type) {
